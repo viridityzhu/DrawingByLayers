@@ -3,5 +3,6 @@
 
 data/
 *.pkl
+*.zip
 
 output/*
