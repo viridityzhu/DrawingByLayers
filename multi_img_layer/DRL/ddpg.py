@@ -24,6 +24,11 @@ Decoder = FCN()
 Decoder.load_state_dict(torch.load('../renderer.pkl'))
 
 def decode(x, canvas): # b * (10 + 3)
+    '''
+    Takes in a tensor x containing stroke information and RGB color values, 
+    as well as a tensor representing the current canvas. 
+    It decodes the stroke information and modifies the canvas accordingly.
+    '''
     x = x.view(-1, 10 + 3) # 10: circle, 3: rgb values
     stroke = 1 - Decoder(x[:, :10]) # 128x128
     stroke = stroke.view(-1, 128, 128, 1)
