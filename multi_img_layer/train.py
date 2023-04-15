@@ -47,12 +47,15 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             if step > args.warmup:
                 # [optional] evaluate
                 if episode > 0 and validate_interval > 0 and episode % validate_interval == 0:
-                    reward, dist = evaluate(env, agent.select_action, debug=debug)
+                    # in test mode, the agent acts for a whole episode, and returns the total reward
+                    reward, dist = evaluate(env, policy=agent.select_action, debug=debug)
+                    # print, log, and save model.
                     if debug: prRed('Step_{:07d}: mean_reward:{:.3f} mean_dist:{:.3f} var_dist:{:.3f}'.format(step - 1, np.mean(reward), np.mean(dist), np.var(dist)))
                     writer.add_scalar('validate/mean_reward', np.mean(reward), step)
                     writer.add_scalar('validate/mean_dist', np.mean(dist), step)
                     writer.add_scalar('validate/var_dist', np.var(dist), step)
                     agent.save_model(output)
+
             train_time_interval = time.time() - time_stamp
             time_stamp = time.time()
             tot_Q = 0.
@@ -66,7 +69,7 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
                 else:
                     lr = (3e-5, 1e-4)
                 # update policy
-                for i in range(episode_train_times):
+                for _ in range(episode_train_times):
                     Q, value_loss = agent.update_policy(lr)
                     tot_Q += Q.data.cpu().numpy()
                     tot_value_loss += value_loss.data.cpu().numpy()

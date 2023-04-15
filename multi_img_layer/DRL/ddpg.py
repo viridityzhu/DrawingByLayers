@@ -120,14 +120,15 @@ class DDPG(object):
 
     def play(self, state, target=False):
         '''
-        Given a state, returns an action by passing the state through the actor neural network. 
+        Passing the state through the actor neural network and return an action. 
         If target==True, uses the target actor network instead.
         '''
         state = torch.cat((state[:, :6].float() / 255, state[:, 6:7].float() / self.max_step, coord.expand(state.shape[0], 2, 128, 128)), 1)
         if target:
-            return self.actor_target(state)
+            action = self.actor_target(state)
         else:
-            return self.actor(state) # state ---actor---> action
+            action = self.actor(state) # state ---actor---> action
+        return action
 
     def _update_gan(self, state):
         canvas = state[:, :3]
@@ -205,7 +206,7 @@ class DDPG(object):
         soft_update(self.actor_target, self.actor, self.tau)
         soft_update(self.critic_target, self.critic, self.tau)
 
-        return -policy_loss, value_loss
+        return -policy_loss, value_loss # Q, critic loss
 
     def observe(self, reward, state, done, step):
         '''
