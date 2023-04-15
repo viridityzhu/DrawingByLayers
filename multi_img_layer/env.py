@@ -106,8 +106,8 @@ class Paint:
     
     def observation(self):
         '''
-        returns the current observation of the environment.
-        Current observation includes the current canvas, the target image, and the number of steps taken so far.
+        returns the current observation (state) of the environment.
+        Current observation (state) includes the current canvas, the target image, and the number of steps taken so far.
         - canvas B * 3 * width * width
         - gt B * 3 * width * width
         - T B * 1 * width * width

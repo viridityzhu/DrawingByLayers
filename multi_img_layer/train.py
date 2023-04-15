@@ -15,7 +15,7 @@ writer = TensorBoard('../train_log/{}'.format(exp))
 os.system('ln -sf ../train_log/{} ./log'.format(exp))
 os.system('mkdir ./model')
 
-def train(agent, env, evaluate):
+def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
     train_times = args.train_times
     env_batch = args.env_batch
     validate_interval = args.validate_interval
