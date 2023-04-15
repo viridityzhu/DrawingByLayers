@@ -37,7 +37,7 @@ def train(agent, env, evaluate):
         if observation is None:
             observation = env.reset()
             agent.reset(observation, noise_factor)    
-        # action
+        # action: 5 * strokes
         action = agent.select_action(observation, noise_factor=noise_factor)
         observation, reward, done, _ = env.step(action)
         agent.observe(reward, observation, done, step)

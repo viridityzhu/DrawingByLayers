@@ -26,22 +26,23 @@ test_num = 0
 
 class Paint:
     '''
-    The Paint class represents a painting environment with a canvas and a target image to be painted. The environment can be reset, and actions can be taken to modify the canvas.
+    The Paint class represents a painting environment with a canvas and a target image to be painted. 
+    The environment can be reset, and actions can be taken to modify the canvas.
+    Methods:
+        - load_data(): loads data from a dataset and separates it into training and testing sets.
+        - _pre_data(id, test): preprocesses an image by applying augmentations and transposing it.
+        - reset(test=False, begin_num=False): resets the environment to its initial state and returns the initial observation.
+        - observation(): returns the current observation of the environment.
+        - step(action): performs an action on the environment and returns the next observation, reward, done flag, and additional information.
+        - _cal_trans(s, t): calculates the transformation of a source image given a target image.
+        - _cal_dis(): calculates the distance between the current canvas and the target image.
+        - _cal_reward(): calculates the reward obtained for the current step.
     '''
     def __init__(self, batch_size, max_step):
         '''
         Args:
             - batch_size (int): the number of images in each batch
             - max_step (int): the maximum number of steps allowed for each episode
-        Methods:
-            - load_data(): loads data from a dataset and separates it into training and testing sets.
-            - _pre_data(id, test): preprocesses an image by applying augmentations and transposing it.
-            - reset(test=False, begin_num=False): resets the environment to its initial state and returns the initial observation.
-            - observation(): returns the current observation of the environment.
-            - step(action): performs an action on the environment and returns the next observation, reward, done flag, and additional information.
-            - _cal_trans(s, t): calculates the transformation of a source image given a target image.
-            - _cal_dis(): calculates the distance between the current canvas and the target image.
-            - _cal_reward(): calculates the reward obtained for the current step.
         '''
         self.batch_size = batch_size
         self.max_step = max_step
