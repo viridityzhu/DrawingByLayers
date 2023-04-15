@@ -4,6 +4,8 @@ import random
 import numpy as np
 import argparse
 from DRL.evaluator import Evaluator
+from DRL.ddpg import DDPG
+from DRL.multi import fastenv
 from utils.util import *
 from utils.tensorboard import TensorBoard
 import time
@@ -27,16 +29,20 @@ def train(agent, env, evaluate):
     tot_reward = 0.
     observation = None
     noise_factor = args.noise_factor
-    while step <= train_times:
+    # training loop
+    while step <= train_times: # 2000000
         step += 1
         episode_steps += 1
-        # reset if it is the start of episode
+        # reset the environment if it is the start of episode
         if observation is None:
             observation = env.reset()
             agent.reset(observation, noise_factor)    
+        # action
         action = agent.select_action(observation, noise_factor=noise_factor)
         observation, reward, done, _ = env.step(action)
         agent.observe(reward, observation, done, step)
+
+        # every 40 steps, update policy and reset the environment
         if (episode_steps >= max_step and max_step):
             if step > args.warmup:
                 # [optional] evaluate
@@ -52,12 +58,14 @@ def train(agent, env, evaluate):
             tot_Q = 0.
             tot_value_loss = 0.
             if step > args.warmup:
+                # adjust learning rate
                 if step < 10000 * max_step:
                     lr = (3e-4, 1e-3)
                 elif step < 20000 * max_step:
                     lr = (1e-4, 3e-4)
                 else:
                     lr = (3e-5, 1e-4)
+                # update policy
                 for i in range(episode_train_times):
                     Q, value_loss = agent.update_policy(lr)
                     tot_Q += Q.data.cpu().numpy()
@@ -69,7 +77,7 @@ def train(agent, env, evaluate):
             if debug: prBlack('#{}: steps:{} interval_time:{:.2f} train_time:{:.2f}' \
                 .format(episode, step, train_time_interval, time.time()-time_stamp)) 
             time_stamp = time.time()
-            # reset
+            # reset the environment and episode
             observation = None
             episode_steps = 0
             episode += 1
@@ -103,12 +111,14 @@ if __name__ == "__main__":
     random.seed(args.seed)
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
-    from DRL.ddpg import DDPG
-    from DRL.multi import fastenv
+
+    # Initialize environment, agent, and evaluator
     fenv = fastenv(args.max_step, args.env_batch, writer)
     agent = DDPG(args.batch_size, args.env_batch, args.max_step, \
                  args.tau, args.discount, args.rmsize, \
                  writer, args.resume, args.output)
     evaluate = Evaluator(args, writer)
+
     print('observation_space', fenv.observation_space, 'action_space', fenv.action_space)
+    # train
     train(agent, fenv, evaluate)

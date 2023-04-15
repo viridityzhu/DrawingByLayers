@@ -25,15 +25,34 @@ train_num = 0
 test_num = 0
 
 class Paint:
+    '''
+    The Paint class represents a painting environment with a canvas and a target image to be painted. The environment can be reset, and actions can be taken to modify the canvas.
+    '''
     def __init__(self, batch_size, max_step):
+        '''
+        Args:
+            - batch_size (int): the number of images in each batch
+            - max_step (int): the maximum number of steps allowed for each episode
+        Methods:
+            - load_data(): loads data from a dataset and separates it into training and testing sets.
+            - _pre_data(id, test): preprocesses an image by applying augmentations and transposing it.
+            - reset(test=False, begin_num=False): resets the environment to its initial state and returns the initial observation.
+            - observation(): returns the current observation of the environment.
+            - step(action): performs an action on the environment and returns the next observation, reward, done flag, and additional information.
+            - _cal_trans(s, t): calculates the transformation of a source image given a target image.
+            - _cal_dis(): calculates the distance between the current canvas and the target image.
+            - _cal_reward(): calculates the reward obtained for the current step.
+        '''
         self.batch_size = batch_size
         self.max_step = max_step
         self.action_space = (13)
         self.observation_space = (self.batch_size, width, width, 7)
-        self.test = False
+        self.test = False # whether the environment is in test mode or not
         
     def load_data(self):
-        # CelebA
+        '''
+        loads data from CelebA dataset and separates it into training and testing sets.
+        '''
         global train_num, test_num
         for i in range(200000):
             img_id = '%06d' % (i + 1)
@@ -51,7 +70,10 @@ class Paint:
                     print('loaded {} images'.format(i + 1))
         print('finish loading data, {} training images, {} testing images'.format(str(train_num), str(test_num)))
         
-    def pre_data(self, id, test):
+    def _pre_data(self, id, test):
+        '''
+        preprocesses an image by applying augmentations and transposing it.
+        '''
         if test:
             img = img_test[id]
         else:
@@ -62,8 +84,11 @@ class Paint:
         return np.transpose(img, (2, 0, 1))
     
     def reset(self, test=False, begin_num=False):
+        '''
+        resets the environment to its initial state and returns the initial observation.
+        '''
         self.test = test
-        self.imgid = [0] * self.batch_size
+        self.imgid = [0] * self.batch_size # a list containing the index of the current image in the batch
         self.gt = torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device)
         for i in range(self.batch_size):
             if test:
@@ -71,37 +96,48 @@ class Paint:
             else:
                 id = np.random.randint(train_num)
             self.imgid[i] = id
-            self.gt[i] = torch.tensor(self.pre_data(id, test))
+            self.gt[i] = torch.tensor(self._pre_data(id, test))
         self.tot_reward = ((self.gt.float() / 255) ** 2).mean(1).mean(1).mean(1)
         self.stepnum = 0
         self.canvas = torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device)
-        self.lastdis = self.ini_dis = self.cal_dis()
+        self.lastdis = self.ini_dis = self._cal_dis()
         return self.observation()
     
     def observation(self):
-        # canvas B * 3 * width * width
-        # gt B * 3 * width * width
-        # T B * 1 * width * width
+        '''
+        returns the current observation of the environment.
+        Current observation includes the current canvas, the target image, and the number of steps taken so far.
+        - canvas B * 3 * width * width
+        - gt B * 3 * width * width
+        - T B * 1 * width * width
+        '''
         ob = []
         T = torch.ones([self.batch_size, 1, width, width], dtype=torch.uint8) * self.stepnum
         return torch.cat((self.canvas, self.gt, T.to(device)), 1) # canvas, img, T
 
-    def cal_trans(self, s, t):
+    def _cal_trans(self, s, t):
         return (s.transpose(0, 3) * t).transpose(0, 3)
     
     def step(self, action):
+        '''
+        performs an action on the environment and returns:
+            - the next observation
+            - reward
+            - done flag
+            - additional information (None)
+        '''
         self.canvas = (decode(action, self.canvas.float() / 255) * 255).byte()
         self.stepnum += 1
         ob = self.observation()
         done = (self.stepnum == self.max_step)
-        reward = self.cal_reward() # np.array([0.] * self.batch_size)
+        reward = self._cal_reward() # np.array([0.] * self.batch_size)
         return ob.detach(), reward, np.array([done] * self.batch_size), None
 
-    def cal_dis(self):
+    def _cal_dis(self):
         return (((self.canvas.float() - self.gt.float()) / 255) ** 2).mean(1).mean(1).mean(1)
     
-    def cal_reward(self):
-        dis = self.cal_dis()
+    def _cal_reward(self):
+        dis = self._cal_dis()
         reward = (self.lastdis - dis) / (self.ini_dis + 1e-8)
         self.lastdis = dis
         return to_numpy(reward)

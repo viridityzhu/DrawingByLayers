@@ -4,5 +4,7 @@
 data/
 *.pkl
 *.zip
+.vscode/
+*.env
 
 output/*
