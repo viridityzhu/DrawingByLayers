@@ -54,7 +54,8 @@ We also provide 百度网盘 source. 链接: https://pan.baidu.com/s/1GELBQCeYoj
 ## Training
 
 ### Datasets
-Download the [CelebA](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) dataset and put the aligned images in data/img_align_celeba/\*\*\*\*\*\*.jpg
+~~Download the [CelebA](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) dataset and put the aligned images in data/img_align_celeba/\*\*\*\*\*\*.jpg~~
+Download img_align_celeba directly from [https://drive.google.com/u/0/uc?id=0B7EVK8r0v71pZjFTYXZWM3FlRnM&export=download](https://drive.google.com/u/0/uc?id=0B7EVK8r0v71pZjFTYXZWM3FlRnM&export=download), then unzip it into `data/`
 
 ### Neural Renderer
 To create a differentiable painting environment, we need train the neural renderer firstly. 
