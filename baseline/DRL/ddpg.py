@@ -24,8 +24,8 @@ Decoder = FCN()
 Decoder.load_state_dict(torch.load('../renderer.pkl'))
 
 def decode(x, canvas): # b * (10 + 3)
-    x = x.view(-1, 10 + 3)
-    stroke = 1 - Decoder(x[:, :10])
+    x = x.view(-1, 10 + 3) # 10: circle, 3: rgb values
+    stroke = 1 - Decoder(x[:, :10]) # 128x128
     stroke = stroke.view(-1, 128, 128, 1)
     color_stroke = stroke * x[:, -3:].view(-1, 1, 1, 3)
     stroke = stroke.permute(0, 3, 1, 2)
@@ -82,7 +82,7 @@ class DDPG(object):
         if target:
             return self.actor_target(state)
         else:
-            return self.actor(state)
+            return self.actor(state) # state ---actor---> action
 
     def update_gan(self, state):
         canvas = state[:, :3]
