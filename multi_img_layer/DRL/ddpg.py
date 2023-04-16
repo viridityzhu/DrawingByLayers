@@ -31,13 +31,13 @@ def decode(x, canvas): # b * 5 * (10 + 3)
     It decodes the stroke information and modifies the canvas accordingly.
     Note: the input x is a batch of 5 strokes, each stroke is a 13-dim vector.
     '''
-    x = x.view(-1, 10 + 3) # 10: circle, 3: rgb values
-    stroke = 1 - Decoder(x[:, :10]) # 128x128
-    stroke = stroke.view(-1, 128, 128, 1)
-    color_stroke = stroke * x[:, -3:].view(-1, 1, 1, 3)
-    stroke = stroke.permute(0, 3, 1, 2)
-    color_stroke = color_stroke.permute(0, 3, 1, 2)
-    stroke = stroke.view(-1, 5, 1, 128, 128)
+    x = x.view(-1, 10 + 3) # [bx5, 13], 10: circle, 3: rgb values
+    stroke = 1 - Decoder(x[:, :10]) # [bx5, 128, 128] 128x128
+    stroke = stroke.view(-1, 128, 128, 1) # [bx5, 128, 128, 1]
+    color_stroke = stroke * x[:, -3:].view(-1, 1, 1, 3) # [bx5, 128, 128, 3]
+    stroke = stroke.permute(0, 3, 1, 2) # [bx5, 1, 128, 128]
+    color_stroke = color_stroke.permute(0, 3, 1, 2) # [bx5, 3, 128, 128]
+    stroke = stroke.view(-1, 5, 1, 128, 128) # [b, 5, 1, 128, 128]
     color_stroke = color_stroke.view(-1, 5, 3, 128, 128)
     for i in range(5):
         canvas = canvas * (1 - stroke[:, i]) + color_stroke[:, i]
@@ -71,7 +71,7 @@ class DDPG(object):
     '''
     def __init__(self, batch_size=64, env_batch=1, max_step=40, \
                  tau=0.001, discount=0.9, rmsize=800, \
-                 writer=None, resume=None, output_path=None):
+                 writer=None, resume=None, output_path=None, lambda_stroke_size_reg=0.001):
         '''
         Args:
         - batch_size (int): the batch size for training the neural networks
@@ -88,12 +88,21 @@ class DDPG(object):
         self.max_step = max_step
         self.env_batch = env_batch
         self.batch_size = batch_size        
+        self.lambda_stroke_size_reg = lambda_stroke_size_reg
 
         self.current_actor_num = 0
         self.ACTOR_NUM = 4
         self.actors = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)] # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
         self.actor_targets = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)]
         self.actor_optims  = [Adam(actor.parameters(), lr=1e-2) for actor in self.actors]
+        self.stroke_sizes = [
+            # TODO: the stroke sizes are randomly chosen, we need to tune them
+            # (lower bound, upper bound)
+            (0.6, 0.8), # actor1. 用较粗的笔画画出图像中的远景 
+            (0.6, 0.8), # actor2. 用较粗的笔画画出图像中的近景
+            (0.4, 0.6), # actor3. 用较细的笔画画出图像中的远景
+            (0.4, 0.6), # actor4. 用较细的笔画画出图像中的近景
+        ]
 
         self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
         self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
@@ -208,18 +217,45 @@ class DDPG(object):
             action = self._play(state)
             pre_q, _ = self.evaluate(state.detach(), action)
             policy_loss = -pre_q.mean() # -Q(s, a)
+            
+            
+            stroke_size = self._compute_stroke_size(action) # [b*5*2, 1]
+            upper_bound, lower_bound = self.stroke_sizes[i]
+            upper_bound = torch.repeat(upper_bound, self.batch_size*5*2, 1).to(self.device)
+            lower_bound = torch.repeat(lower_bound, self.batch_size*5*2, 1).to(self.device)
+            reg_stroke_size = max(0, stroke_size - upper_bound)**2 + max(0, lower_bound - stroke_size)**2
+            actor_total_loss = policy_loss + self.lambda_stroke_size_reg * reg_stroke_size.mean()
             self.actors[i].zero_grad()
-            policy_loss.backward(retain_graph=True)
+            actor_total_loss.backward(retain_graph=True)
             self.actor_optims[i].step()
             
             # Target update
             soft_update(self.actor_targets[i], self.actors[i], self.tau)
             soft_update(self.critic_target, self.critic, self.tau)
 
-            policy_loss_sum += -policy_loss
+            policy_loss_sum += actor_total_loss
             value_loss_sum += value_loss
 
         return policy_loss_sum, value_loss_sum # Q, critic loss
+
+    def _compute_stroke_size(self, action):
+        '''
+        Action contains stroke parameters (10) and rgb values (3).
+        This function computes the stroke size (radius) for each stroke.
+        Note that stroke sizes are linearly interpolated between the initial and final values.
+        So I concatenate the initial and final values and return a tensor of size [batch_size * 5 * 2, 1].
+        There is a 5, because there are 5 strokes per batch.
+        '''
+        action = action.view(-1, 10 + 3) # [bx5, 13], 10: circle, 3: rgb values
+        z0 = action[:, 6 : 7] # radius, [bx5, 1]
+        z2 = action[:, 7 : 8] # radius
+        tmp = 1. / 100
+        i1, i2 = 0, 99
+        t1, t2 = i1 * tmp, i2 * tmp
+        size1 = (int)((1-t1) * z0 + t1 * z2) # radius at t1 (initial), [bx5, 1]
+        size2 = (int)((1-t2) * z0 + t2 * z2) # radius at t2 (final)
+        sizes = torch.cat([size1, size2], 0) # [bx5x2, 1]
+        return sizes
 
     def observe(self, reward, state, done, step):
         '''
