@@ -119,7 +119,7 @@ class DDPG(object):
         self.action = [None] * self.env_batch # Most recent action
         self._choose_device()        
 
-    def _play(self, state, target=False):
+    def _play(self, state, step, target=False):
         '''
         Passing the state through the actor neural network and return an action. 
         If target==True, uses the target actor network instead.
@@ -165,7 +165,7 @@ class DDPG(object):
                 self.writer.add_scalar('train/gan_reward', gan_reward.mean(), self.log)
             return (Q + gan_reward), gan_reward
     
-    def update_policy(self, lr):
+    def update_policy(self, lr, step):
         '''
         Updates the actor and critic neural networks using loss functions. 
         Returns the policy loss and value loss.
@@ -229,14 +229,14 @@ class DDPG(object):
             action[i] = action[i] + np.random.normal(0, self.noise_level[i], action.shape[1:]).astype('float32')
         return np.clip(action.astype('float32'), 0, 1)
     
-    def select_action(self, state, return_fix=False, noise_factor=0):
+    def select_action(self, state, step, return_fix=False, noise_factor=0):
         '''
         Given a state, returns an action. 
         If return_fix=True, returns the action without adding noise.
         '''
         self.eval()
         with torch.no_grad():
-            action = self._play(state)
+            action = self._play(state, step)
             action = to_numpy(action)
         if noise_factor > 0:        
             action = self._noise_action(noise_factor, state, action)
