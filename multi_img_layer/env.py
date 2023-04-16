@@ -20,7 +20,9 @@ width = 128
 convas_area = width * width
 
 img_train = []
+msk_train = []
 img_test = []
+msk_test = []
 train_num = 0
 test_num = 0
 
@@ -49,27 +51,32 @@ class Paint:
         self.action_space = (13)
         self.observation_space = (self.batch_size, width, width, 7)
         self.test = False # whether the environment is in test mode or not
+        self.current_actor_num = 0
         
     def load_data(self):
         '''
         loads data from CelebA dataset and separates it into training and testing sets.
         '''
         global train_num, test_num
-        for i in range(200000):
-            img_id = '%06d' % (i + 1)
+        for i in range(2000):
+            img_id = '%05d' % i
             try:
-                img = cv2.imread('./data/img_align_celeba/' + img_id + '.jpg', cv2.IMREAD_UNCHANGED)
+                img = cv2.imread('../data/origin_img/' + img_id + '.jpg', cv2.IMREAD_UNCHANGED)
+                msk = cv2.imread('../data/merged_mask/' + img_id + '.png', cv2.IMREAD_UNCHANGED)
                 img = cv2.resize(img, (width, width))
-                if i > 2000:                
+                msk = cv2.resize(msk, (width, width))
+                if i > 100:                
                     train_num += 1
                     img_train.append(img)
+                    msk_train.append(msk)
                 else:
                     test_num += 1
                     img_test.append(img)
+                    msk_test.append(msk)
             finally:
-                if (i + 1) % 10000 == 0:                    
+                if (i + 1) % 1000 == 0:                    
                     print('loaded {} images'.format(i + 1))
-        print('finish loading data, {} training images, {} testing images'.format(str(train_num), str(test_num)))
+        print('finish loading data, {} training images and masks, {} testing images and masks'.format(str(train_num), str(test_num)))
         
     def _pre_data(self, id, test):
         '''
@@ -77,12 +84,16 @@ class Paint:
         '''
         if test:
             img = img_test[id]
+            msk = msk_test[id]
         else:
             img = img_train[id]
+            msk = msk_train[id]
         if not test:
             img = aug(img)
+            msk = aug(msk)
         img = np.asarray(img)
-        return np.transpose(img, (2, 0, 1))
+        msk = np.asarray(msk)
+        return np.transpose(img, (2, 0, 1)), np.transpose(msk, (0, 1))
     
     def reset(self, test=False, begin_num=False):
         '''
@@ -91,13 +102,14 @@ class Paint:
         self.test = test
         self.imgid = [0] * self.batch_size # a list containing the index of the current image in the batch
         self.gt = torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device)
+        self.msk = torch.zeros([self.batch_size, 1, width, width], dtype=torch.uint8).to(device)
         for i in range(self.batch_size):
             if test:
                 id = (i + begin_num)  % test_num
             else:
                 id = np.random.randint(train_num)
             self.imgid[i] = id
-            self.gt[i] = torch.tensor(self._pre_data(id, test))
+            self.gt[i], self.msk[i] = torch.tensor(self._pre_data(id, test))
         self.tot_reward = ((self.gt.float() / 255) ** 2).mean(1).mean(1).mean(1)
         self.stepnum = 0
         self.canvas = torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device)
@@ -119,7 +131,7 @@ class Paint:
     def _cal_trans(self, s, t):
         return (s.transpose(0, 3) * t).transpose(0, 3)
     
-    def step(self, action):
+    def step(self, action, step):
         '''
         performs an action on the environment and returns:
             - the next observation
@@ -127,18 +139,35 @@ class Paint:
             - done flag
             - additional information (None)
         '''
+        self._select_current_actor(step)
         self.canvas = (decode(action, self.canvas.float() / 255) * 255).byte()
         self.stepnum += 1
         ob = self.observation()
         done = (self.stepnum == self.max_step)
-        reward = self._cal_reward() # np.array([0.] * self.batch_size)
+        reward = self._cal_reward(self.current_actor_num) # np.array([0.] * self.batch_size)
         return ob.detach(), reward, np.array([done] * self.batch_size), None
 
-    def _cal_dis(self):
-        return (((self.canvas.float() - self.gt.float()) / 255) ** 2).mean(1).mean(1).mean(1)
+    def _cal_dis(self, actor_num):
+        if (actor_num in [0, 2]):
+            mask = torch.logical_not(self.msk)
+        else:
+            mask = self.msk
+        masked_canvas = self.canvas.float() * mask# 将 canvas 乘以掩码
+        masked_gt = self.gt.float() * mask # 将 gt 乘以掩码
+        return (((self.masked_canvas.float() - self.masked_gt.float()) / 255) ** 2).mean(1).mean(1).mean(1)
     
-    def _cal_reward(self):
-        dis = self._cal_dis()
+    def _cal_reward(self, actor_num):
+        dis = self._cal_dis(actor_num)
         reward = (self.lastdis - dis) / (self.ini_dis + 1e-8)
         self.lastdis = dis
         return to_numpy(reward)
+
+    def _select_current_actor(self, step):
+        if step < 10:
+            self.current_actor_num = 0
+        elif step < 20:
+            self.current_actor_num = 1
+        elif step < 30:
+            self.current_actor_num = 2
+        else:
+            self.current_actor_num = 3
