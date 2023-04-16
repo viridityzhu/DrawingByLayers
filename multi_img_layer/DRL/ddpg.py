@@ -54,12 +54,12 @@ class DDPG(object):
 
 
     Methods:
-    - play(state, target=False): Given a state, returns an action by passing the state through the actor neural network. If target=True, uses the target actor network instead.
     - evaluate(state, action, target=False): Given a state and an action, evaluates the expected reward by passing the state-action pair through the critic neural network. If target=True, uses the target critic network instead.
     - update_policy(lr): Updates the actor and critic neural networks by performing gradient descent on the loss functions. Returns the policy loss and value loss.
     - observe(reward, state, done, step): Adds a new experience to the replay buffer and update state.
     - select_action(state, return_fix=False, noise_factor=0): Given a state, returns an action. If return_fix=True, returns the action without adding noise.
     - reset(obs, factor): Resets the environment with a new observation and noise factor.
+    - _play(state, target=False): returns an action by passing the state through the actor neural network. If target=True, uses the target actor network instead.
     - load_weights(path): Loads the weights of a previously saved checkpoint.
     - save_model(path): Saves the current model to the specified path.
     - eval(): Sets the neural networks to evaluation mode.
@@ -118,7 +118,7 @@ class DDPG(object):
         self.action = [None] * self.env_batch # Most recent action
         self._choose_device()        
 
-    def play(self, state, target=False):
+    def _play(self, state, target=False):
         '''
         Passing the state through the actor neural network and return an action. 
         If target==True, uses the target actor network instead.
@@ -183,7 +183,7 @@ class DDPG(object):
         self._update_gan(next_state)
         
         with torch.no_grad():
-            next_action = self.play(next_state, True)
+            next_action = self._play(next_state, True)
             target_q, _ = self.evaluate(next_state, next_action, target=True)
             target_q = self.discount * ((1 - terminal.float()).view(-1, 1)) * target_q
                 
@@ -195,7 +195,7 @@ class DDPG(object):
         value_loss.backward(retain_graph=True)
         self.critic_optim.step()
 
-        action = self.play(state)
+        action = self._play(state)
         pre_q, _ = self.evaluate(state.detach(), action)
         policy_loss = -pre_q.mean() # -Q(s, a)
         self.actor.zero_grad()
@@ -235,7 +235,7 @@ class DDPG(object):
         '''
         self.eval()
         with torch.no_grad():
-            action = self.play(state)
+            action = self._play(state)
             action = to_numpy(action)
         if noise_factor > 0:        
             action = self._noise_action(noise_factor, state, action)
