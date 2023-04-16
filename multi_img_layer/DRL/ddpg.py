@@ -119,16 +119,18 @@ class DDPG(object):
         self.action = [None] * self.env_batch # Most recent action
         self._choose_device()        
 
-    def _play(self, state, step, target=False):
+    def _play(self, state, target=False):
         '''
         Passing the state through the actor neural network and return an action. 
         If target==True, uses the target actor network instead.
         '''
         state = torch.cat((state[:, :6].float() / 255, state[:, 6:7].float() / self.max_step, coord.expand(state.shape[0], 2, 128, 128)), 1)
         if target:
-            action = self.actor_target(state)
+            actor_target = self.actor_targets[self.current_actor_num]
+            action = actor_target(state)
         else:
-            action = self.actor(state) # state ---actor---> action
+            actor= self.actors[self.current_actor_num]
+            action = actor(state) # state ---actor---> action
         return action
 
     def _update_gan(self, state):
@@ -229,14 +231,27 @@ class DDPG(object):
             action[i] = action[i] + np.random.normal(0, self.noise_level[i], action.shape[1:]).astype('float32')
         return np.clip(action.astype('float32'), 0, 1)
     
+    def _select_current_actor(self, step):
+        if step <= 10:
+            self.current_actor_num = 0
+        elif step <= 20:
+            self.current_actor_num = 1
+        elif step <= 30:
+            self.current_actor_num = 2
+        else:
+            self.current_actor_num = 3
+    
     def select_action(self, state, step, return_fix=False, noise_factor=0):
         '''
         Given a state, returns an action. 
         If return_fix=True, returns the action without adding noise.
         '''
         self.eval()
+
+        self._select_current_actor(step)
+
         with torch.no_grad():
-            action = self._play(state, step)
+            action = self._play(state)
             action = to_numpy(action)
         if noise_factor > 0:        
             action = self._noise_action(noise_factor, state, action)
