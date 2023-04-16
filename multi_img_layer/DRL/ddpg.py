@@ -89,6 +89,7 @@ class DDPG(object):
         self.env_batch = env_batch
         self.batch_size = batch_size        
 
+        self.current_actor_num = 0
         self.ACTOR_NUM = 4
         self.actors = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)] # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
         self.actor_targets = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)]
@@ -105,7 +106,7 @@ class DDPG(object):
         hard_update(self.critic_target, self.critic)
         
         # Create replay buffer
-        self.memory = rpm(rmsize * max_step)
+        self.memory = [rpm(rmsize * max_step / 4) for _ in range(self.ACTOR_NUM)] 
 
         # Hyper-parameters
         self.tau = tau
@@ -167,49 +168,58 @@ class DDPG(object):
                 self.writer.add_scalar('train/gan_reward', gan_reward.mean(), self.log)
             return (Q + gan_reward), gan_reward
     
-    def update_policy(self, lr, step):
+    def update_policy(self, lr):
         '''
         Updates the actor and critic neural networks using loss functions. 
         Returns the policy loss and value loss.
         '''
         self.log += 1
+        policy_loss_sum = 0
+        value_loss_sum = 0
         
-        for param_group in self.critic_optim.param_groups:
-            param_group['lr'] = lr[0]
-        for param_group in self.actor_optim.param_groups:
-            param_group['lr'] = lr[1]
+        for i in range(self.ACTOR_NUM):
+            self.current_actor_num = i
+
+            # Sample batch
+            state, action, reward, next_state, terminal = self.memory[i].sample_batch(self.batch_size, device)
+            # terminal is a bool flag indicating whether the episode has ended.
+
+            # self._select_current_actor(step)
+            for param_group in self.critic_optim.param_groups:
+                param_group['lr'] = lr[0]
+            for param_group in self.actor_optims[i].param_groups:
+                param_group['lr'] = lr[1]
+
+            self._update_gan(next_state)
             
-        # Sample batch
-        state, action, reward, next_state, terminal = self.memory.sample_batch(self.batch_size, device)
-        # terminal is a bool flag indicating whether the episode has ended.
+            with torch.no_grad():
+                next_action = self._play(next_state, True)
+                target_q, _ = self.evaluate(next_state, next_action, target=True)
+                target_q = self.discount * ((1 - terminal.float()).view(-1, 1)) * target_q
+                    
+            cur_q, step_reward = self.evaluate(state, action, target=False)
+            target_q += step_reward.detach()
+            
+            value_loss = criterion(cur_q, target_q) # L2(current_q, target_q)
+            self.critic.zero_grad()
+            value_loss.backward(retain_graph=True)
+            self.critic_optim.step()
 
-        self._update_gan(next_state)
-        
-        with torch.no_grad():
-            next_action = self._play(next_state, True)
-            target_q, _ = self.evaluate(next_state, next_action, target=True)
-            target_q = self.discount * ((1 - terminal.float()).view(-1, 1)) * target_q
-                
-        cur_q, step_reward = self.evaluate(state, action, target=False)
-        target_q += step_reward.detach()
-        
-        value_loss = criterion(cur_q, target_q) # L2(current_q, target_q)
-        self.critic.zero_grad()
-        value_loss.backward(retain_graph=True)
-        self.critic_optim.step()
+            action = self._play(state)
+            pre_q, _ = self.evaluate(state.detach(), action)
+            policy_loss = -pre_q.mean() # -Q(s, a)
+            self.actors[i].zero_grad()
+            policy_loss.backward(retain_graph=True)
+            self.actor_optims[i].step()
+            
+            # Target update
+            soft_update(self.actor_targets[i], self.actors[i], self.tau)
+            soft_update(self.critic_target, self.critic, self.tau)
 
-        action = self._play(state)
-        pre_q, _ = self.evaluate(state.detach(), action)
-        policy_loss = -pre_q.mean() # -Q(s, a)
-        self.actor.zero_grad()
-        policy_loss.backward(retain_graph=True)
-        self.actor_optim.step()
-        
-        # Target update
-        soft_update(self.actor_target, self.actor, self.tau)
-        soft_update(self.critic_target, self.critic, self.tau)
+            policy_loss_sum += -policy_loss
+            value_loss_sum += value_loss
 
-        return -policy_loss, value_loss # Q, critic loss
+        return policy_loss_sum, value_loss_sum # Q, critic loss
 
     def observe(self, reward, state, done, step):
         '''

@@ -38,7 +38,7 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             observation = env.reset()
             agent.reset(observation, noise_factor)    
         # action: 5 * strokes
-        action = agent.select_action(observation, noise_factor=noise_factor)
+        action = agent.select_action(observation, episode_steps, noise_factor=noise_factor)
         observation, reward, done, _ = env.step(action)
         agent.observe(reward, observation, done, step)
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     parser.add_argument('--validate_interval', default=50, type=int, help='how many episodes to perform a validation')
     parser.add_argument('--validate_episodes', default=5, type=int, help='how many episode to perform during validation')
     parser.add_argument('--train_times', default=2000000, type=int, help='total traintimes')
-    parser.add_argument('--episode_train_times', default=10, type=int, help='train times for each episode')    
+    parser.add_argument('--episode_train_times', default=5, type=int, help='train times for each episode')    
     parser.add_argument('--resume', default=None, type=str, help='Resuming model path for testing')
     parser.add_argument('--output', default='./model', type=str, help='Resuming model path for testing')
     parser.add_argument('--debug', dest='debug', action='store_true', help='print some info')
