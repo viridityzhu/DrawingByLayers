@@ -227,13 +227,14 @@ class DDPG(object):
         Includes [the most recent state, action, reward, next state, done flag].
         Then update the most recent state.
         '''
+        self._select_current_actor(step)
         s0 = torch.tensor(self.state, device='cpu')
         a = to_tensor(self.action, "cpu")
         r = to_tensor(reward, "cpu")
         s1 = torch.tensor(state, device='cpu')
         d = to_tensor(done.astype('float32'), "cpu")
         for i in range(self.env_batch):
-            self.memory.append([s0[i], a[i], r[i], s1[i], d[i]])
+            self.memory[self.current_actor_num].append([s0[i], a[i], r[i], s1[i], d[i]])
         self.state = state
 
     def _noise_action(self, noise_factor, state, action):
