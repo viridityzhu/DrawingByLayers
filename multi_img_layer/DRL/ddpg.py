@@ -232,11 +232,11 @@ class DDPG(object):
         return np.clip(action.astype('float32'), 0, 1)
     
     def _select_current_actor(self, step):
-        if step <= 10:
+        if step < 10:
             self.current_actor_num = 0
-        elif step <= 20:
+        elif step < 20:
             self.current_actor_num = 1
-        elif step <= 30:
+        elif step < 30:
             self.current_actor_num = 2
         else:
             self.current_actor_num = 3
