@@ -89,12 +89,13 @@ class DDPG(object):
         self.env_batch = env_batch
         self.batch_size = batch_size        
 
-        self.actor = ResNet(9, 18, 65) # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
-        self.actor_target = ResNet(9, 18, 65)
+        self.ACTOR_NUM = 4
+        self.actors = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)] # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
+        self.actor_targets = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)]
+        self.actor_optims  = [Adam(actor.parameters(), lr=1e-2) for actor in self.actors]
+
         self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
         self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
-
-        self.actor_optim  = Adam(self.actor.parameters(), lr=1e-2)
         self.critic_optim  = Adam(self.critic.parameters(), lr=1e-2)
 
         if (resume != None):
@@ -254,14 +255,16 @@ class DDPG(object):
 
     def load_weights(self, path):
         if path is None: return
-        self.actor.load_state_dict(torch.load('{}/actor.pkl'.format(path)))
+        for i, actor in enumerate(self.actors):
+            actor.load_state_dict(torch.load('{}/actor_{}.pkl'.format(path, i)))
         self.critic.load_state_dict(torch.load('{}/critic.pkl'.format(path)))
         load_gan(path)
         
     def save_model(self, path):
-        self.actor.cpu()
         self.critic.cpu()
-        torch.save(self.actor.state_dict(),'{}/actor.pkl'.format(path))
+        for i, actor in enumerate(self.actors):
+            actor.cpu()
+            torch.save(actor.state_dict(),'{}/actor_{}.pkl'.format(path, i))
         torch.save(self.critic.state_dict(),'{}/critic.pkl'.format(path))
         save_gan(path)
         self._choose_device()
@@ -270,8 +273,10 @@ class DDPG(object):
         '''
         Set eval mode
         '''
-        self.actor.eval()
-        self.actor_target.eval()
+        for actor in self.actors:
+            actor.eval()
+        for actor_target in self.actor_targets:
+            actor_target.eval()
         self.critic.eval()
         self.critic_target.eval()
     
@@ -279,14 +284,18 @@ class DDPG(object):
         '''
         Set train mode
         '''
-        self.actor.train()
-        self.actor_target.train()
+        for actor in self.actors:
+            actor.train()
+        for actor_target in self.actor_targets:
+            actor_target.train()
         self.critic.train()
         self.critic_target.train()
     
     def _choose_device(self):
         Decoder.to(device)
-        self.actor.to(device)
-        self.actor_target.to(device)
+        for actor in self.actors:
+            actor.to(device)
+        for actor_target in self.actor_targets:
+            actor_target.to(device)
         self.critic.to(device)
         self.critic_target.to(device)
