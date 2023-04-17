@@ -59,14 +59,15 @@ class Paint:
         '''
         global train_num, test_num
         for i in range(2000):
+            img_id0 = str(i)
             img_id = '%05d' % i
             try:
-                img = cv2.imread('../data/origin_img/' + img_id + '.jpg', cv2.IMREAD_UNCHANGED)
+                img = cv2.imread('../data/origin_img/' + img_id0 + '.jpg', cv2.IMREAD_UNCHANGED)
                 msk = cv2.imread('../data/merged_mask/' + img_id + '.png', cv2.IMREAD_GRAYSCALE)
                 _, msk = cv2.threshold(msk, 127, 1, cv2.THRESH_BINARY)
                 img = cv2.resize(img, (width, width))
                 msk = cv2.resize(msk, (width, width))
-                if i > 100:                
+                if i > 99:                
                     train_num += 1
                     img_train.append(img)
                     msk_train.append(msk)
@@ -75,7 +76,7 @@ class Paint:
                     img_test.append(img)
                     msk_test.append(msk)
             finally:
-                if (i + 1) % 1000 == 0:                    
+                if (i + 1) % 200 == 0:                    
                     print('loaded {} images'.format(i + 1))
         print('finish loading data, {} training images and masks, {} testing images and masks'.format(str(train_num), str(test_num)))
         

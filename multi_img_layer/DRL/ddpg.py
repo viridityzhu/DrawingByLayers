@@ -111,7 +111,7 @@ class DDPG(object):
         if (resume != None):
             self.load_weights(resume)
 
-        hard_update(self.actor_target, self.actor)
+        hard_update(self.actor_targets, self.actors)
         hard_update(self.critic_target, self.critic)
         
         # Create replay buffer

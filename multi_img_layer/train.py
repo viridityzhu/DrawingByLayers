@@ -10,7 +10,10 @@ from utils.util import *
 from utils.tensorboard import TensorBoard
 import time
 
-exp = os.path.abspath('.').split('/')[-1]
+# exp = os.path.abspath('.').split('/')[-1]
+exp = os.path.basename(os.getcwd())
+log_dir = os.path.join('../train_log', exp)
+writer = TensorBoard(log_dir)
 writer = TensorBoard('../train_log/{}'.format(exp))
 os.system('ln -sf ../train_log/{} ./log'.format(exp))
 os.system('mkdir ./model')
@@ -62,9 +65,9 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             tot_value_loss = 0.
             if step > args.warmup:
                 # adjust learning rate
-                if step < 10000 * max_step:
+                if step < 50 * max_step:
                     lr = (3e-4, 1e-3)
-                elif step < 20000 * max_step:
+                elif step < 100 * max_step:
                     lr = (1e-4, 3e-4)
                 else:
                     lr = (3e-5, 1e-4)
@@ -89,7 +92,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Learning to Paint')
 
     # hyper-parameter
-    parser.add_argument('--warmup', default=400, type=int, help='timestep without training but only filling the replay memory')
+    parser.add_argument('--warmup', default=100, type=int, help='timestep without training but only filling the replay memory')
     parser.add_argument('--discount', default=0.95**5, type=float, help='discount factor')
     parser.add_argument('--batch_size', default=96, type=int, help='minibatch size')
     parser.add_argument('--rmsize', default=800, type=int, help='replay memory size')
@@ -100,8 +103,8 @@ if __name__ == "__main__":
     parser.add_argument('--noise_factor', default=0, type=float, help='noise level for parameter space noise')
     parser.add_argument('--validate_interval', default=50, type=int, help='how many episodes to perform a validation')
     parser.add_argument('--validate_episodes', default=5, type=int, help='how many episode to perform during validation')
-    parser.add_argument('--train_times', default=2000000, type=int, help='total traintimes')
-    parser.add_argument('--episode_train_times', default=5, type=int, help='train times for each episode')    
+    parser.add_argument('--train_times', default=100000, type=int, help='total traintimes') # 2000000
+    parser.add_argument('--episode_train_times', default=5, type=int, help='train times for each episode') # 10
     parser.add_argument('--resume', default=None, type=str, help='Resuming model path for testing')
     parser.add_argument('--output', default='./model', type=str, help='Resuming model path for testing')
     parser.add_argument('--debug', dest='debug', action='store_true', help='print some info')
