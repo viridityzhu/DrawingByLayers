@@ -59,7 +59,7 @@ class Paint:
         loads data from CelebA dataset and separates it into training and testing sets.
         '''
         global train_num, test_num
-        for i in range(200):
+        for i in range(2000):
             img_id0 = str(i)
             img_id = '%05d' % i
             try:

@@ -51,8 +51,8 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
         if (episode_steps >= max_step and max_step):
             if step > args.warmup:
                 # [optional] evaluate
-                # if episode > 0 and validate_interval > 0 and episode % validate_interval == 0:
-                if True:
+                if episode > 0 and validate_interval > 0 and episode % validate_interval == 0:
+                # if True:
                     # in test mode, the agent acts for a whole episode, and returns the total reward
                     reward, dist = evaluate(env, policy=agent.select_action, debug=debug)
                     # print, log, and save model.
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument('--actor_num', default=4, type=int, help='how many actors to use.')
     parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
     parser.add_argument('--noise_factor', default=0, type=float, help='noise level for parameter space noise')
-    parser.add_argument('--validate_interval', default=50, type=int, help='how many episodes to perform a validation')
+    parser.add_argument('--validate_interval', default=10, type=int, help='how many episodes to perform a validation')
     parser.add_argument('--validate_episodes', default=5, type=int, help='how many episode to perform during validation')
     parser.add_argument('--train_times', default=100000, type=int, help='total traintimes') # 2000000
     parser.add_argument('--episode_train_times', default=5, type=int, help='train times for each episode') # 10
