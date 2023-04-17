@@ -116,7 +116,7 @@ class Paint:
         self.lastdis = self.ini_dis = self._cal_dis()
         return self.observation()
     
-    def observation(self):
+    def observation(self, actor_num):
         '''
         returns the current observation (state) of the environment.
         Current observation (state) includes the current canvas, mask, the target image, and the number of steps taken so far.
@@ -125,6 +125,8 @@ class Paint:
         - T B * 1 * width * width
         '''
         ob = []
+        if (actor_num in [0, 2]):
+            self.msk = torch.logical_not(self.msk)
         T = torch.ones([self.batch_size, 1, width, width], dtype=torch.uint8) * self.stepnum
         return torch.cat((self.canvas, self.gt, T.to(device), self.msk), 1) # canvas, img, T
 
@@ -142,7 +144,7 @@ class Paint:
         self._select_current_actor(step)
         self.canvas = (decode(action, self.canvas.float() / 255) * 255).byte()
         self.stepnum += 1
-        ob = self.observation()
+        ob = self.observation(self.current_actor_num)
         done = (self.stepnum == self.max_step)
         reward = self._cal_reward(self.current_actor_num) # np.array([0.] * self.batch_size)
         return ob.detach(), reward, np.array([done] * self.batch_size), None
@@ -154,7 +156,7 @@ class Paint:
             mask = self.msk
         masked_canvas = self.canvas.float() * mask# 将 canvas 乘以掩码
         masked_gt = self.gt.float() * mask # 将 gt 乘以掩码
-        return (((self.masked_canvas.float() - self.masked_gt.float()) / 255) ** 2).mean(1).mean(1).mean(1)
+        return (((masked_canvas.float() - masked_gt.float()) / 255) ** 2).mean(1).mean(1).mean(1)
     
     def _cal_reward(self, actor_num):
         dis = self._cal_dis(actor_num)
