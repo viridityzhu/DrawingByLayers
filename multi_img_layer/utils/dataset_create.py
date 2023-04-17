@@ -1,3 +1,4 @@
+# ICCV2019-LearningToPaint\data\dataset_create.py
 import os
 import shutil
 
@@ -6,7 +7,7 @@ src_dir = 'CelebAMask-HQ/CelebA-HQ-img/'
 dst_dir = 'origin-img/'
 
 # 遍历源文件夹中的前2000张图片
-for i in range(2000):
+for i in range(30000):
     # 拼接出图片文件名
     filename = f"{i}.jpg"
     # 源文件路径
