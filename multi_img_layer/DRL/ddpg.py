@@ -92,8 +92,8 @@ class DDPG(object):
 
         self.current_actor_num = 0
         self.ACTOR_NUM = 4
-        self.actors = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)] # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
-        self.actor_targets = [ResNet(9, 18, 65) for _ in range(self.ACTOR_NUM)]
+        self.actors = [ResNet(10, 18, 65) for _ in range(self.ACTOR_NUM)] # target, canvas, stepnum, coordconv, mask 3 + 3 + 1 + 2 + 1
+        self.actor_targets = [ResNet(10, 18, 65) for _ in range(self.ACTOR_NUM)]
         self.actor_optims  = [Adam(actor.parameters(), lr=1e-2) for actor in self.actors]
         self.stroke_sizes = [
             # TODO: the stroke sizes are randomly chosen, we need to tune them
@@ -104,8 +104,8 @@ class DDPG(object):
             (0.4, 0.6), # actor4. 用较细的笔画画出图像中的近景
         ]
 
-        self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
-        self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
+        self.critic = ResNet_wobn(3 + 10, 18, 1) # add the last canvas for better prediction
+        self.critic_target = ResNet_wobn(3 + 10, 18, 1) 
         self.critic_optim  = Adam(self.critic.parameters(), lr=1e-2)
 
         if (resume != None):
@@ -134,7 +134,11 @@ class DDPG(object):
         Passing the state through the actor neural network and return an action. 
         If target==True, uses the target actor network instead.
         '''
-        state = torch.cat((state[:, :6].float() / 255, state[:, 6:7].float() / self.max_step, coord.expand(state.shape[0], 2, 128, 128)), 1)
+        state = torch.cat(( state[:, :6].float() / 255, # canvas and gt
+                            state[:, 6:7].float() / self.max_step, # T stepnum / max_step
+                            state[:, 7:8], # mask
+                            coord.expand(state.shape[0], 2, 128, 128) # coord encoding
+                            ), 1)
         if target:
             actor_target = self.actor_targets[self.current_actor_num]
             action = actor_target(state)
@@ -161,12 +165,18 @@ class DDPG(object):
         T = state[:, 6 : 7]
         gt = state[:, 3 : 6].float() / 255
         canvas0 = state[:, :3].float() / 255
-        msk= state[:, 7 :8].float() / 255
         canvas1 = decode(action, canvas0)
-        gan_reward = cal_reward(canvas1, gt) - cal_reward(canvas0, gt)
+        mask = state[:, 7 : 8]
+
+        # Apply the mask to the canvases and ground truth images
+        masked_canvas0 = canvas0 * mask
+        masked_canvas1 = canvas1 * mask
+        masked_gt = gt * mask
+
+        gan_reward = cal_reward(masked_canvas1, masked_gt) - cal_reward(masked_canvas0, masked_gt)
         # L2_reward = ((canvas0 - gt) ** 2).mean(1).mean(1).mean(1) - ((canvas1 - gt) ** 2).mean(1).mean(1).mean(1)        
         coord_ = coord.expand(state.shape[0], 2, 128, 128)
-        merged_state = torch.cat([canvas0, canvas1, gt, (T + 1).float() / self.max_step, coord_], 1)
+        merged_state = torch.cat([canvas0, canvas1, gt, (T + 1).float() / self.max_step, mask, coord_], 1)
         # canvas0 is not necessarily added
         if target:
             Q = self.critic_target(merged_state)
@@ -219,12 +229,13 @@ class DDPG(object):
             pre_q, _ = self.evaluate(state.detach(), action)
             policy_loss = -pre_q.mean() # -Q(s, a)
             
-            
+            # stroke size regularization
             stroke_size = self._compute_stroke_size(action) # [b*5*2, 1]
             upper_bound, lower_bound = self.stroke_sizes[i]
             upper_bound = torch.repeat(upper_bound, self.batch_size*5*2, 1).to(self.device)
             lower_bound = torch.repeat(lower_bound, self.batch_size*5*2, 1).to(self.device)
             reg_stroke_size = max(0, stroke_size - upper_bound)**2 + max(0, lower_bound - stroke_size)**2
+
             actor_total_loss = policy_loss + self.lambda_stroke_size_reg * reg_stroke_size.mean()
             self.actors[i].zero_grad()
             actor_total_loss.backward(retain_graph=True)
