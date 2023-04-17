@@ -116,7 +116,7 @@ class DDPG(object):
         hard_update(self.critic_target, self.critic)
         
         # Create replay buffer
-        self.memory = [rpm(rmsize * max_step / 4) for _ in range(self.ACTOR_NUM)] 
+        self.memory = [rpm(rmsize * max_step // 4) for _ in range(self.ACTOR_NUM)] 
 
         # Hyper-parameters
         self.tau = tau
