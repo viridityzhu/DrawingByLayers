@@ -93,7 +93,7 @@ class Paint:
             msk = aug(msk)
         img = np.asarray(img)
         msk = np.asarray(msk)
-        return np.transpose(img, (2, 0, 1)), np.transpose(msk, (0, 1))
+        return np.transpose(img, (2, 0, 1)), np.transpose(msk, (2, 0, 1))
     
     def reset(self, test=False, begin_num=False):
         '''
@@ -119,14 +119,14 @@ class Paint:
     def observation(self):
         '''
         returns the current observation (state) of the environment.
-        Current observation (state) includes the current canvas, the target image, and the number of steps taken so far.
+        Current observation (state) includes the current canvas, mask, the target image, and the number of steps taken so far.
         - canvas B * 3 * width * width
         - gt B * 3 * width * width
         - T B * 1 * width * width
         '''
         ob = []
         T = torch.ones([self.batch_size, 1, width, width], dtype=torch.uint8) * self.stepnum
-        return torch.cat((self.canvas, self.gt, T.to(device)), 1) # canvas, img, T
+        return torch.cat((self.canvas, self.gt, T.to(device), self.msk), 1) # canvas, img, T
 
     def _cal_trans(self, s, t):
         return (s.transpose(0, 3) * t).transpose(0, 3)

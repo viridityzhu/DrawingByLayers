@@ -39,7 +39,7 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             agent.reset(observation, noise_factor)    
         # action: 5 * strokes
         action = agent.select_action(observation, episode_steps, noise_factor=noise_factor)
-        observation, reward, done, _ = env.step(action)
+        observation, reward, done, _ = env.step(action, episode_steps)
         agent.observe(reward, observation, done, episode_steps)
 
         # every 40 steps, update policy and reset the environment
