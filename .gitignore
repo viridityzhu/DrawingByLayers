@@ -8,3 +8,5 @@ data/
 *.env
 
 output/*
+train_log/*
+multi_img_layer/log/*

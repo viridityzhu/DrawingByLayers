@@ -49,7 +49,7 @@ class Paint:
         self.batch_size = batch_size
         self.max_step = max_step
         self.action_space = (13)
-        self.observation_space = (self.batch_size, width, width, 7)
+        self.observation_space = (self.batch_size, width, width, 8)
         self.test = False # whether the environment is in test mode or not
         self.current_actor_num = 0
         self.ACTOR_NUM = actor_num

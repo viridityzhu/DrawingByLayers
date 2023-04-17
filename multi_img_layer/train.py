@@ -49,11 +49,12 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
         if (episode_steps >= max_step and max_step):
             if step > args.warmup:
                 # [optional] evaluate
-                if episode > 0 and validate_interval > 0 and episode % validate_interval == 0:
+                # if episode > 0 and validate_interval > 0 and episode % validate_interval == 0:
+                if True:
                     # in test mode, the agent acts for a whole episode, and returns the total reward
                     reward, dist = evaluate(env, policy=agent.select_action, debug=debug)
                     # print, log, and save model.
-                    if debug: prRed('Step_{:07d}: mean_reward:{:.3f} mean_dist:{:.3f} var_dist:{:.3f}'.format(step - 1, np.mean(reward), np.mean(dist), np.var(dist)))
+                    if debug: prRed('eval - Step_{:07d}: mean_reward:{:.3f} mean_dist:{:.3f} var_dist:{:.3f}'.format(step - 1, np.mean(reward), np.mean(dist), np.var(dist)))
                     writer.add_scalar('validate/mean_reward', np.mean(reward), step)
                     writer.add_scalar('validate/mean_dist', np.mean(dist), step)
                     writer.add_scalar('validate/var_dist', np.var(dist), step)
@@ -80,7 +81,8 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
                 writer.add_scalar('train/actor_lr', lr[1], step)
                 writer.add_scalar('train/Q', tot_Q / episode_train_times, step)
                 writer.add_scalar('train/critic_loss', tot_value_loss / episode_train_times, step)
-            if debug: prBlack('#{}: steps:{} interval_time:{:.2f} train_time:{:.2f}' \
+                if debug: prRed(f'Update policy - Q:{tot_Q / episode_train_times:.3f}, critic_loss:{tot_value_loss / episode_train_times:.3f}')
+            if debug: prBlack('episode{}: steps:{} interval_time:{:.2f} train_time:{:.2f}' \
                 .format(episode, step, train_time_interval, time.time()-time_stamp)) 
             time_stamp = time.time()
             # reset the environment and episode
