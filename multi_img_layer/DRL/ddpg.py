@@ -283,7 +283,7 @@ class DDPG(object):
         Then update the most recent state.
         '''
         self._select_current_actor(step)
-        s0 = torch.tensor(self.state, device='cpu')
+        s0 = self.state.to(device='cpu')
         a = to_tensor(self.action, "cpu")
         r = to_tensor(reward, "cpu")
         s1 = state.to(device='cpu')

@@ -12,8 +12,7 @@ import time
 
 # exp = os.path.abspath('.').split('/')[-1]
 exp = os.path.basename(os.getcwd())
-log_dir = os.path.join('../train_log', exp)
-writer = TensorBoard(log_dir)
+# log_dir = os.path.join('../train_log', exp)
 writer = TensorBoard('../train_log/{}'.format(exp))
 os.system('ln -sf ../train_log/{} ./log'.format(exp))
 os.system('mkdir ./model')
@@ -44,6 +43,9 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
         action = agent.select_action(observation, episode_steps, noise_factor=noise_factor)
         observation, reward, done, _ = env.step(action, episode_steps)
         agent.observe(reward, observation, done, episode_steps)
+
+        if step % 20 == 0:
+            print('step: {}, episode: {}, episode_steps: {}, reward: {}'.format(step, episode, episode_steps, reward.mean()))
 
         # every 40 steps, update policy and reset the environment
         if (episode_steps >= max_step and max_step):

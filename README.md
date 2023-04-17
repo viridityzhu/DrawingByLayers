@@ -37,6 +37,7 @@ conda activate paint
 conda install pytorch=1.13.0 torchvision pytorch-cuda=11.7 -c pytorch -c nvidia
 conda install -c menpo opencv 
 conda install -c conda-forge tensorboardx
+conda install scipy==1.2.0
 ```
 
 ## Testing
