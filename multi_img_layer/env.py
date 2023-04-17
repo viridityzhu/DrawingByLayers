@@ -62,7 +62,8 @@ class Paint:
             img_id = '%05d' % i
             try:
                 img = cv2.imread('../data/origin_img/' + img_id + '.jpg', cv2.IMREAD_UNCHANGED)
-                msk = cv2.imread('../data/merged_mask/' + img_id + '.png', cv2.IMREAD_UNCHANGED)
+                msk = cv2.imread('../data/merged_mask/' + img_id + '.png', cv2.IMREAD_GRAYSCALE)
+                _, msk = cv2.threshold(msk, 127, 1, cv2.THRESH_BINARY)
                 img = cv2.resize(img, (width, width))
                 msk = cv2.resize(msk, (width, width))
                 if i > 100:                
