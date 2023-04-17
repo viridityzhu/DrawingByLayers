@@ -98,10 +98,10 @@ class DDPG(object):
         self.stroke_sizes = [
             # TODO: the stroke sizes are randomly chosen, we need to tune them
             # (lower bound, upper bound)
-            (0.6, 0.8), # actor1. 用较粗的笔画画出图像中的远景 
-            (0.6, 0.8), # actor2. 用较粗的笔画画出图像中的近景
-            (0.4, 0.6), # actor3. 用较细的笔画画出图像中的远景
-            (0.4, 0.6), # actor4. 用较细的笔画画出图像中的近景
+            (0.1, 99.0), # actor1. 用较粗的笔画画出图像中的远景 
+            (0.1, 99.0), # actor2. 用较粗的笔画画出图像中的近景
+            (0.0, 0.2), # actor3. 用较细的笔画画出图像中的远景
+            (0.0, 0.2), # actor4. 用较细的笔画画出图像中的近景
         ]
 
         self.critic = ResNet_wobn(3 + 10, 18, 1) # add the last canvas for better prediction
@@ -232,7 +232,7 @@ class DDPG(object):
             
             # stroke size regularization
             stroke_size = self._compute_stroke_size(action) # [b*5*2, 1]
-            upper_bound, lower_bound = self.stroke_sizes[i]
+            lower_bound, upper_bound = self.stroke_sizes[i]
             # 将upper_bound扩展到指定形状
             upper_bound = torch.tensor(upper_bound)
             lower_bound = torch.tensor(lower_bound)
@@ -244,6 +244,7 @@ class DDPG(object):
             reg_stroke_size = torch.max(torch.zeros_like(stroke_size), stroke_size - upper_bound)**2 + torch.max(torch.zeros_like(stroke_size), lower_bound - stroke_size)**2
 
             actor_total_loss = policy_loss + self.lambda_stroke_size_reg * reg_stroke_size.mean()
+            # actor_total_loss = critic_output + gan_loss + a * reg_stroke_size
             self.actors[i].zero_grad()
             actor_total_loss.backward(retain_graph=True)
             self.actor_optims[i].step()
