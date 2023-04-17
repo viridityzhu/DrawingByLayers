@@ -174,11 +174,12 @@ class Paint:
         return to_numpy(reward)
 
     def _select_current_actor(self, step):
-        if step < 10:
+        actor_step_num = self.max_step // 4
+        if step < actor_step_num:
             self.current_actor_num = 0
-        elif step < 20:
+        elif step < actor_step_num * 2:
             self.current_actor_num = 1
-        elif step < 30:
+        elif step < actor_step_num * 3:
             self.current_actor_num = 2
         else:
             self.current_actor_num = 3
