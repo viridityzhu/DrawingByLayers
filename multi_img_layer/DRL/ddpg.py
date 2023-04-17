@@ -280,7 +280,7 @@ class DDPG(object):
         s0 = torch.tensor(self.state, device='cpu')
         a = to_tensor(self.action, "cpu")
         r = to_tensor(reward, "cpu")
-        s1 = torch.tensor(state, device='cpu')
+        s1 = state.to(device='cpu')
         d = to_tensor(done.astype('float32'), "cpu")
         for i in range(self.env_batch):
             self.memory[self.current_actor_num].append([s0[i], a[i], r[i], s1[i], d[i]])

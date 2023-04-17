@@ -59,7 +59,7 @@ class Paint:
         loads data from CelebA dataset and separates it into training and testing sets.
         '''
         global train_num, test_num
-        for i in range(2000):
+        for i in range(200):
             img_id0 = str(i)
             img_id = '%05d' % i
             try:
@@ -96,6 +96,7 @@ class Paint:
             msk = aug(msk)
         img = np.asarray(img)
         msk = np.asarray(msk)
+        msk = msk[..., np.newaxis]
         return np.transpose(img, (2, 0, 1)), np.transpose(msk, (2, 0, 1))
     
     def reset(self, test=False, begin_num=False):
@@ -112,13 +113,14 @@ class Paint:
             else:
                 id = np.random.randint(train_num)
             self.imgid[i] = id
-            self.gt[i], self.msk[i] = torch.tensor(self._pre_data(id, test))
+            gt_i, msk_i = self._pre_data(id, test)
+            self.gt[i], self.msk[i] = torch.tensor(gt_i), torch.tensor(msk_i)
         self.tot_reward = ((self.gt.float() / 255) ** 2).mean(1).mean(1).mean(1)
         self.stepnum = 0
         self.canvas = torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device)
         self.canvases_for_actors = [torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device) for _ in range(self.ACTOR_NUM)]
-        self.lastdis = self.ini_dis = self._cal_dis()
-        return self.observation()
+        self.lastdis = self.ini_dis = self._cal_dis(0)
+        return self.observation(0)
     
     def observation(self, actor_num):
         '''
