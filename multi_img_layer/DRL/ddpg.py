@@ -233,9 +233,15 @@ class DDPG(object):
             # stroke size regularization
             stroke_size = self._compute_stroke_size(action) # [b*5*2, 1]
             upper_bound, lower_bound = self.stroke_sizes[i]
-            upper_bound = torch.repeat(upper_bound, self.batch_size*5*2, 1).to(self.device)
-            lower_bound = torch.repeat(lower_bound, self.batch_size*5*2, 1).to(self.device)
-            reg_stroke_size = max(0, stroke_size - upper_bound)**2 + max(0, lower_bound - stroke_size)**2
+            # 将upper_bound扩展到指定形状
+            upper_bound = torch.tensor(upper_bound)
+            lower_bound = torch.tensor(lower_bound)
+            upper_bound = upper_bound.expand((self.batch_size*5*2, 1)).to(stroke_size.device)
+            lower_bound = lower_bound.expand((self.batch_size*5*2, 1)).to(stroke_size.device)
+
+            # upper_bound = torch.repeat(upper_bound, self.batch_size*5*2, 1).to(self.device)
+            # lower_bound = torch.repeat(lower_bound, self.batch_size*5*2, 1).to(self.device)
+            reg_stroke_size = torch.max(torch.zeros_like(stroke_size), stroke_size - upper_bound)**2 + torch.max(torch.zeros_like(stroke_size), lower_bound - stroke_size)**2
 
             actor_total_loss = policy_loss + self.lambda_stroke_size_reg * reg_stroke_size.mean()
             self.actors[i].zero_grad()
@@ -265,8 +271,8 @@ class DDPG(object):
         tmp = 1. / 100
         i1, i2 = 0, 99
         t1, t2 = i1 * tmp, i2 * tmp
-        size1 = (int)((1-t1) * z0 + t1 * z2) # radius at t1 (initial), [bx5, 1]
-        size2 = (int)((1-t2) * z0 + t2 * z2) # radius at t2 (final)
+        size1 = (1-t1) * z0 + t1 * z2 # radius at t1 (initial), [bx5, 1]
+        size2 = (1-t2) * z0 + t2 * z2 # radius at t2 (final)
         sizes = torch.cat([size1, size2], 0) # [bx5x2, 1]
         return sizes
 
