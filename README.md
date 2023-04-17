@@ -29,6 +29,16 @@ pip3 install tensorboardX
 pip3 install opencv-python
 ```
 
+Use conda to manage the environment:
+```sh
+conda create -n paint python=3.9
+conda activate paint
+# find a suitable version for your gpu, e.g.: cuda 11.7
+conda install pytorch=1.13.0 torchvision pytorch-cuda=11.7 -c pytorch -c nvidia
+conda install -c menpo opencv 
+conda install -c conda-forge tensorboardx
+```
+
 ## Testing
 Make sure there are renderer.pkl and actor.pkl before testing.
 
