@@ -71,7 +71,7 @@ class DDPG(object):
     '''
     def __init__(self, batch_size=64, env_batch=1, max_step=40, \
                  tau=0.001, discount=0.9, rmsize=800, \
-                 writer=None, resume=None, output_path=None, lambda_stroke_size_reg=0.001):
+                 writer=None, resume=None, output_path=None, lambda_stroke_size_reg=0.001, actor_num=4):
         '''
         Args:
         - batch_size (int): the batch size for training the neural networks
@@ -89,9 +89,9 @@ class DDPG(object):
         self.env_batch = env_batch
         self.batch_size = batch_size        
         self.lambda_stroke_size_reg = lambda_stroke_size_reg
+        self.ACTOR_NUM = actor_num
 
         self.current_actor_num = 0
-        self.ACTOR_NUM = 4
         self.actors = [ResNet(10, 18, 65) for _ in range(self.ACTOR_NUM)] # target, canvas, stepnum, coordconv, mask 3 + 3 + 1 + 2 + 1
         self.actor_targets = [ResNet(10, 18, 65) for _ in range(self.ACTOR_NUM)]
         self.actor_optims  = [Adam(actor.parameters(), lr=1e-2) for actor in self.actors]

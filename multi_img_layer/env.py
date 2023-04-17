@@ -40,7 +40,7 @@ class Paint:
         - _cal_dis(): calculates the distance between the current canvas and the target image.
         - _cal_reward(): calculates the reward obtained for the current step.
     '''
-    def __init__(self, batch_size, max_step):
+    def __init__(self, batch_size, max_step, actor_num):
         '''
         Args:
             - batch_size (int): the number of images in each batch
@@ -52,6 +52,7 @@ class Paint:
         self.observation_space = (self.batch_size, width, width, 7)
         self.test = False # whether the environment is in test mode or not
         self.current_actor_num = 0
+        self.ACTOR_NUM = actor_num
         
     def load_data(self):
         '''
@@ -115,6 +116,7 @@ class Paint:
         self.tot_reward = ((self.gt.float() / 255) ** 2).mean(1).mean(1).mean(1)
         self.stepnum = 0
         self.canvas = torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device)
+        self.canvases_for_actors = [torch.zeros([self.batch_size, 3, width, width], dtype=torch.uint8).to(device) for _ in range(self.ACTOR_NUM)]
         self.lastdis = self.ini_dis = self._cal_dis()
         return self.observation()
     
@@ -145,6 +147,9 @@ class Paint:
         '''
         self._select_current_actor(step)
         self.canvas = (decode(action, self.canvas.float() / 255) * 255).byte()
+        if self.test: # if test, save an additional canvas for the layer of the current actor
+            curr_canvas = self.canvases_for_actors[self.current_actor_num]
+            self.canvases_for_actors[self.current_actor_num] = (decode(action, curr_canvas.float() / 255) * 255).byte()
         self.stepnum += 1
         ob = self.observation(self.current_actor_num)
         done = (self.stepnum == self.max_step)

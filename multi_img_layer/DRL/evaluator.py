@@ -21,7 +21,7 @@ class Evaluator(object):
             # start episode
             episode_reward = np.zeros(self.env_batch)
             while (episode_steps < self.max_step or not self.max_step):
-                action = policy(observation)
+                action = policy(observation, episode_steps)
                 observation, reward, done, (step_num) = env.step(action)
                 episode_reward += reward
                 episode_steps += 1
