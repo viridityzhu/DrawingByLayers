@@ -44,7 +44,7 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
         observation, reward, done, _ = env.step(action, episode_steps)
         agent.observe(reward, observation, done, episode_steps)
 
-        if step % 20 == 0:
+        if step % 200 == 0:
             print('step: {}, episode: {}, episode_steps: {}, reward: {}'.format(step, episode, episode_steps, reward.mean()))
 
         # every 40 steps, update policy and reset the environment
@@ -68,9 +68,9 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             tot_value_loss = 0.
             if step > args.warmup:
                 # adjust learning rate
-                if step < 50 * max_step:
+                if step < 10000 * max_step:
                     lr = (3e-4, 1e-3)
-                elif step < 100 * max_step:
+                elif step < 20000 * max_step:
                     lr = (1e-4, 3e-4)
                 else:
                     lr = (3e-5, 1e-4)
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Learning to Paint')
 
     # hyper-parameter
-    parser.add_argument('--warmup', default=100, type=int, help='timestep without training but only filling the replay memory')
+    parser.add_argument('--warmup', default=400, type=int, help='timestep without training but only filling the replay memory')
     parser.add_argument('--discount', default=0.95**5, type=float, help='discount factor')
     parser.add_argument('--batch_size', default=96, type=int, help='minibatch size')
     parser.add_argument('--rmsize', default=800, type=int, help='replay memory size')
@@ -106,9 +106,9 @@ if __name__ == "__main__":
     parser.add_argument('--actor_num', default=4, type=int, help='how many actors to use.')
     parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
     parser.add_argument('--noise_factor', default=0, type=float, help='noise level for parameter space noise')
-    parser.add_argument('--validate_interval', default=10, type=int, help='how many episodes to perform a validation')
-    parser.add_argument('--validate_episodes', default=5, type=int, help='how many episode to perform during validation')
-    parser.add_argument('--train_times', default=100000, type=int, help='total traintimes') # 2000000
+    parser.add_argument('--validate_interval', default=50, type=int, help='how many episodes to perform a validation')
+    parser.add_argument('--validate_episodes', default=1, type=int, help='how many episode to perform during validation')
+    parser.add_argument('--train_times', default=2000000, type=int, help='total traintimes') # 2000000
     parser.add_argument('--episode_train_times', default=5, type=int, help='train times for each episode') # 10
     parser.add_argument('--resume', default=None, type=str, help='Resuming model path for testing')
     parser.add_argument('--output', default='./model', type=str, help='Resuming model path for testing')
