@@ -59,7 +59,7 @@ class Paint:
         loads data from CelebA dataset and separates it into training and testing sets.
         '''
         global train_num, test_num
-        for i in range(30000):
+        for i in range(3000):
             img_id0 = str(i)
             img_id = '%05d' % i
             try:
@@ -68,7 +68,7 @@ class Paint:
                 _, msk = cv2.threshold(msk, 127, 1, cv2.THRESH_BINARY)
                 img = cv2.resize(img, (width, width))
                 msk = cv2.resize(msk, (width, width))
-                if i >= 2000:                
+                if i >= 200:                
                     train_num += 1
                     img_train.append(img)
                     msk_train.append(msk)
@@ -176,11 +176,11 @@ class Paint:
 
     def _select_current_actor(self, step):
         actor_step_num = self.max_step // 10
-        if step < actor_step_num:
+        if step <= actor_step_num:
             self.current_actor_num = 0
-        elif step < actor_step_num * 2:
+        elif step <= actor_step_num * 2:
             self.current_actor_num = 1
-        elif step < actor_step_num * 6:
+        elif step <= actor_step_num * 6:
             self.current_actor_num = 2
         else:
             self.current_actor_num = 3

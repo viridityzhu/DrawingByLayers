@@ -96,7 +96,6 @@ class DDPG(object):
         self.actor_targets = [ResNet(10, 18, 65) for _ in range(self.ACTOR_NUM)]
         self.actor_optims  = [Adam(actor.parameters(), lr=1e-2) for actor in self.actors]
         self.stroke_sizes = [
-            # TODO: the stroke sizes are randomly chosen, we need to tune them
             # (lower bound, upper bound)
             (0.1, 99.0), # actor1. 用较粗的笔画画出图像中的远景 
             (0.1, 99.0), # actor2. 用较粗的笔画画出图像中的近景
@@ -116,7 +115,8 @@ class DDPG(object):
         hard_update(self.critic_target, self.critic)
         
         # Create replay buffer
-        self.memory = [rpm(rmsize * max_step // 4) for _ in range(self.ACTOR_NUM)] 
+        self.memory = [rpm(rmsize * max_step // 10), rpm(rmsize * max_step // 10), \
+                       rpm(rmsize * max_step // 10 * 4), rpm(rmsize * max_step // 10 * 4), rpm(rmsize * 1)] 
 
         # Hyper-parameters
         self.tau = tau
@@ -135,7 +135,7 @@ class DDPG(object):
         Passing the state through the actor neural network and return an action. 
         If target==True, uses the target actor network instead.
         '''
-        state = torch.cat(( state[:, :6].float() / 255, # canvas and gt
+        state = torch.cat(( state[:, :6].float() / 255, # canvas and gt image
                             state[:, 6:7].float() / self.max_step, # T stepnum / max_step
                             state[:, 7:8], # mask
                             coord.expand(state.shape[0], 2, 128, 128) # coord encoding
@@ -157,7 +157,7 @@ class DDPG(object):
             self.writer.add_scalar('train/gan_real', real, self.log)
             self.writer.add_scalar('train/gan_penal', penal, self.log)       
         
-    def evaluate(self, state, action, target=False):
+    def evaluate(self, state, action, target=0):
         '''
         Evaluates the expected reward by passing the state-action pair through the critic neural network. 
         Return Q value, gan_reward.
@@ -174,20 +174,23 @@ class DDPG(object):
         masked_canvas1 = canvas1 * mask
         masked_gt = gt * mask
 
-        gan_reward = cal_reward(masked_canvas1, masked_gt) - cal_reward(masked_canvas0, masked_gt)
+        gan_reward = cal_reward(canvas1, gt) - cal_reward(canvas0, gt)
         # L2_reward = ((canvas0 - gt) ** 2).mean(1).mean(1).mean(1) - ((canvas1 - gt) ** 2).mean(1).mean(1).mean(1)        
         coord_ = coord.expand(state.shape[0], 2, 128, 128)
-        merged_state = torch.cat([masked_canvas0, masked_canvas1, masked_gt, (T + 1).float() / self.max_step, coord_], 1)
+        merged_state = torch.cat([canvas0, canvas1, gt, (T + 1).float() / self.max_step, coord_], 1)
         # canvas0 is not necessarily added
-        if target:
+        if (target == 1):
             Q = self.critic_target(merged_state)
-            return (Q + gan_reward), Q, gan_reward
-        else:
+            return (Q + gan_reward), gan_reward
+        elif (target == 2):
             Q = self.critic(merged_state)
             if self.log % 20 == 0:
                 self.writer.add_scalar('train/expect_reward', Q.mean(), self.log)
                 self.writer.add_scalar('train/gan_reward', gan_reward.mean(), self.log)
-            return (Q + gan_reward), Q, gan_reward
+            return (Q + gan_reward), gan_reward
+        else:
+            gan_reward = cal_reward(masked_canvas1, masked_gt) - cal_reward(masked_canvas0, masked_gt)
+            return gan_reward
     
     def update_policy(self, lr):
         '''
@@ -196,14 +199,17 @@ class DDPG(object):
         '''
         self.log += 1
         reg_stroke_size_sum = 0
-        pre_critic_output_sum = 0
-        pre_gan_loss_sum = 0
+        # pre_critic_output_sum = 0
+        # pre_gan_loss_sum = 0
         policy_loss_sum = 0
-        value_loss_sum = 0
+        # value_loss_sum = 0
         tol_Q_sum = 0
         
         policy_loss_actors = [0, 0, 0, 0]
         stroke_size_actors = [0, 0, 0, 0]
+        
+        # batch_1_4 = self.batch_size // 4
+        # buffer_for_critic = []
         
         for i in range(self.ACTOR_NUM):
             # train each actor
@@ -212,31 +218,25 @@ class DDPG(object):
             # Sample batch from replay buffer of the current actor
             state, action, reward, next_state, terminal = self.memory[i].sample_batch(self.batch_size, device)
             # terminal is a bool flag indicating whether the episode has ended.
+            # buffer_for_critic.append([state[batch_1_4 * i : batch_1_4 * i + batch_1_4], 
+            #                           action, 
+            #                           reward, 
+            #                           next_state, 
+            #                           terminal
+            #                           ])
 
             # self._select_current_actor(step)
-            for param_group in self.critic_optim.param_groups:
-                param_group['lr'] = lr[0]
+            # for param_group in self.critic_optim.param_groups:
+            #     param_group['lr'] = lr[0]
             for param_group in self.actor_optims[i].param_groups:
                 param_group['lr'] = lr[1]
 
             self._update_gan(next_state)
             
-            with torch.no_grad():
-                next_action = self._play(next_state, True)
-                target_q, target_critic_output, target_gan_loss = self.evaluate(next_state, next_action, target=True)
-                target_q = self.discount * ((1 - terminal.float()).view(-1, 1)) * target_q
-                    
-            cur_q, cur_critic_output, step_reward = self.evaluate(state, action, target=False)
-            target_q += step_reward.detach()
-            
-            value_loss = criterion(cur_q, target_q) # L2(current_q, target_q)
-            self.critic.zero_grad()
-            value_loss.backward(retain_graph=True)
-            self.critic_optim.step()
 
             action = self._play(state)
-            pre_q, pre_critic_output, pre_gan_loss = self.evaluate(state.detach(), action)
-            policy_loss = -pre_q.mean() # -Q(s, a) --- pre_critic_output + pre_gan_loss
+            pre_gan_loss = self.evaluate(state.detach(), action)
+            policy_loss = -pre_gan_loss.mean() # -Q(s, a) --- pre_critic_output + pre_gan_loss
             
             # stroke size regularization
             stroke_size = self._compute_stroke_size(action) # [b*5*2, 1]
@@ -257,21 +257,39 @@ class DDPG(object):
             
             # Target update
             soft_update(self.actor_targets[i], self.actors[i], self.tau)
-            soft_update(self.critic_target, self.critic, self.tau)
 
             reg_stroke_size_sum += self.lambda_stroke_size_reg * reg_stroke_size.mean()
-            pre_critic_output_sum += pre_critic_output 
-            pre_gan_loss_sum += pre_gan_loss
+            # pre_critic_output_sum += pre_critic_output 
+            # pre_gan_loss_sum += pre_gan_loss
             policy_loss_sum += policy_loss
-            value_loss_sum += value_loss
+            # value_loss_sum += value_loss
             tol_Q_sum + actor_total_loss
 
             policy_loss_actors[i] = policy_loss
-            stroke_size_actors[i] = self.lambda_stroke_size_reg * reg_stroke_size.mean()
+            stroke_size_actors[i] = reg_stroke_size.mean()
+
+        state, action, reward, next_state, terminal = self.memory[4].sample_batch(self.batch_size, device)
+
+        for param_group in self.critic_optim.param_groups:
+            param_group['lr'] = lr[0]
+
+        with torch.no_grad():
+            next_action = self._play(next_state, True)
+            target_q, target_gan_loss = self.evaluate(next_state, next_action, target=1)
+            target_q = self.discount * ((1 - terminal.float()).view(-1, 1)) * target_q
+                
+        cur_q, step_reward = self.evaluate(state, action, target=2)
+        target_q += step_reward.detach()
+        
+        value_loss = criterion(cur_q, target_q) # L2(current_q, target_q)
+        self.critic.zero_grad()
+        value_loss.backward(retain_graph=True)
+        self.critic_optim.step()
+
+        soft_update(self.critic_target, self.critic, self.tau)
 
          # Q, critic loss
-        return reg_stroke_size_sum, pre_critic_output_sum, pre_gan_loss_sum, \
-            policy_loss_sum, value_loss_sum, tol_Q_sum, \
+        return policy_loss_sum, reg_stroke_size_sum, tol_Q_sum, value_loss, \
             policy_loss_actors, stroke_size_actors
 
     def _compute_stroke_size(self, action):
@@ -307,6 +325,8 @@ class DDPG(object):
         d = to_tensor(done.astype('float32'), "cpu")
         for i in range(self.env_batch):
             self.memory[self.current_actor_num].append([s0[i], a[i], r[i], s1[i], d[i]])
+            if (step == self.max_step):
+                self.memory[4].append([s0[i], a[i], r[i], s1[i], d[i]])
         self.state = state
 
     def _noise_action(self, noise_factor, state, action):
@@ -316,11 +336,11 @@ class DDPG(object):
     
     def _select_current_actor(self, step):
         actor_step_num = self.max_step // 10
-        if step < actor_step_num:
+        if step <= actor_step_num:
             self.current_actor_num = 0
-        elif step < actor_step_num * 2:
+        elif step <= actor_step_num * 2:
             self.current_actor_num = 1
-        elif step < actor_step_num * 6:
+        elif step <= actor_step_num * 6:
             self.current_actor_num = 2
         else:
             self.current_actor_num = 3
