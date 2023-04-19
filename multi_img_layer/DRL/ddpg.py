@@ -181,13 +181,13 @@ class DDPG(object):
         # canvas0 is not necessarily added
         if target:
             Q = self.critic_target(merged_state)
-            return (Q + gan_reward), gan_reward
+            return (Q + gan_reward), Q, gan_reward
         else:
             Q = self.critic(merged_state)
             if self.log % 20 == 0:
                 self.writer.add_scalar('train/expect_reward', Q.mean(), self.log)
                 self.writer.add_scalar('train/gan_reward', gan_reward.mean(), self.log)
-            return (Q + gan_reward), gan_reward
+            return (Q + gan_reward), Q, gan_reward
     
     def update_policy(self, lr):
         '''
@@ -195,13 +195,21 @@ class DDPG(object):
         Returns the policy loss and value loss.
         '''
         self.log += 1
+        reg_stroke_size_sum = 0
+        pre_critic_output_sum = 0
+        pre_gan_loss_sum = 0
         policy_loss_sum = 0
         value_loss_sum = 0
+        tol_Q_sum = 0
+        
+        policy_loss_actors = [0, 0, 0, 0]
+        stroke_size_actors = [0, 0, 0, 0]
         
         for i in range(self.ACTOR_NUM):
+            # train each actor
             self.current_actor_num = i
 
-            # Sample batch
+            # Sample batch from replay buffer of the current actor
             state, action, reward, next_state, terminal = self.memory[i].sample_batch(self.batch_size, device)
             # terminal is a bool flag indicating whether the episode has ended.
 
@@ -215,10 +223,10 @@ class DDPG(object):
             
             with torch.no_grad():
                 next_action = self._play(next_state, True)
-                target_q, _ = self.evaluate(next_state, next_action, target=True)
+                target_q, target_critic_output, target_gan_loss = self.evaluate(next_state, next_action, target=True)
                 target_q = self.discount * ((1 - terminal.float()).view(-1, 1)) * target_q
                     
-            cur_q, step_reward = self.evaluate(state, action, target=False)
+            cur_q, cur_critic_output, step_reward = self.evaluate(state, action, target=False)
             target_q += step_reward.detach()
             
             value_loss = criterion(cur_q, target_q) # L2(current_q, target_q)
@@ -227,8 +235,8 @@ class DDPG(object):
             self.critic_optim.step()
 
             action = self._play(state)
-            pre_q, _ = self.evaluate(state.detach(), action)
-            policy_loss = -pre_q.mean() # -Q(s, a)
+            pre_q, pre_critic_output, pre_gan_loss = self.evaluate(state.detach(), action)
+            policy_loss = -pre_q.mean() # -Q(s, a) --- pre_critic_output + pre_gan_loss
             
             # stroke size regularization
             stroke_size = self._compute_stroke_size(action) # [b*5*2, 1]
@@ -239,12 +247,10 @@ class DDPG(object):
             upper_bound = upper_bound.expand((self.batch_size*5*2, 1)).to(stroke_size.device)
             lower_bound = lower_bound.expand((self.batch_size*5*2, 1)).to(stroke_size.device)
 
-            # upper_bound = torch.repeat(upper_bound, self.batch_size*5*2, 1).to(self.device)
-            # lower_bound = torch.repeat(lower_bound, self.batch_size*5*2, 1).to(self.device)
             reg_stroke_size = torch.max(torch.zeros_like(stroke_size), stroke_size - upper_bound)**2 + torch.max(torch.zeros_like(stroke_size), lower_bound - stroke_size)**2
 
             actor_total_loss = policy_loss + self.lambda_stroke_size_reg * reg_stroke_size.mean()
-            # actor_total_loss = critic_output + gan_loss + a * reg_stroke_size
+            # actor_total_loss = pre_critic_output + pre_gan_loss + a * reg_stroke_size
             self.actors[i].zero_grad()
             actor_total_loss.backward(retain_graph=True)
             self.actor_optims[i].step()
@@ -253,10 +259,20 @@ class DDPG(object):
             soft_update(self.actor_targets[i], self.actors[i], self.tau)
             soft_update(self.critic_target, self.critic, self.tau)
 
-            policy_loss_sum += actor_total_loss
+            reg_stroke_size_sum += self.lambda_stroke_size_reg * reg_stroke_size.mean()
+            pre_critic_output_sum += pre_critic_output 
+            pre_gan_loss_sum += pre_gan_loss
+            policy_loss_sum += policy_loss
             value_loss_sum += value_loss
+            tol_Q_sum + actor_total_loss
 
-        return policy_loss_sum, value_loss_sum # Q, critic loss
+            policy_loss_actors[i] = policy_loss
+            stroke_size_actors[i] = self.lambda_stroke_size_reg * reg_stroke_size.mean()
+
+         # Q, critic loss
+        return reg_stroke_size_sum, pre_critic_output_sum, pre_gan_loss_sum, \
+            policy_loss_sum, value_loss_sum, tol_Q_sum, \
+            policy_loss_actors, stroke_size_actors
 
     def _compute_stroke_size(self, action):
         '''

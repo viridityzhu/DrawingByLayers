@@ -66,23 +66,50 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             time_stamp = time.time()
             tot_Q = 0.
             tot_value_loss = 0.
+            tot_stroke_size = 0.
+            tot_critic_output = 0.
+            tot_gan_loss = 0.
+            policy_loss_actor_sum = [0., 0., 0., 0.]
+            stroke_size_actor_sum = [0., 0., 0., 0.]
             if step > args.warmup:
                 # adjust learning rate
-                if step < 10000 * max_step:
-                    lr = (3e-4, 1e-3)
-                elif step < 20000 * max_step:
+                if step < 10000 * max_step: # 10000 * 40, 0 - 400000
+                    lr = (3e-4, 1e-3) # lr for critic, lr for actor
+                elif step < 20000 * max_step: # 20000 * 40, 400000 - 800000
                     lr = (1e-4, 3e-4)
-                else:
+                else: # 800000 - 2000000
                     lr = (3e-5, 1e-4)
                 # update policy
                 for _ in range(episode_train_times):
-                    Q, value_loss = agent.update_policy(lr)
+                    reg_stroke_size_sum, pre_critic_output_sum, pre_gan_loss_sum, __, \
+                        value_loss, Q, policy_loss_actors, stroke_size_actors = agent.update_policy(lr)
+                    # __(policy_loss_sum) = pre_critic_output_sum + pre_gan_loss_sum
+                    # Q, value_loss = agent.update_policy(lr)
+                    tot_stroke_size += reg_stroke_size_sum.data.cpu().numpy()
+                    tot_critic_output += pre_critic_output_sum.data.cpu().numpy()
+                    tot_gan_loss += pre_gan_loss_sum.data.cpu().numpy()
                     tot_Q += Q.data.cpu().numpy()
                     tot_value_loss += value_loss.data.cpu().numpy()
+                    for i in range(4):
+                        policy_loss_actor_sum[i] += policy_loss_actors[i].data.cpu().numpy()
+                        stroke_size_actor_sum[i] += stroke_size_actors[i].data.cpu().numpy()
                 writer.add_scalar('train/critic_lr', lr[0], step)
                 writer.add_scalar('train/actor_lr', lr[1], step)
+                writer.add_scalar('train/stroke', tot_stroke_size / episode_train_times, step)
+                writer.add_scalar('train/critic_output', tot_critic_output / episode_train_times, step)
+                writer.add_scalar('train/gan_loss', tot_gan_loss / episode_train_times, step)
                 writer.add_scalar('train/Q', tot_Q / episode_train_times, step)
                 writer.add_scalar('train/critic_loss', tot_value_loss / episode_train_times, step)
+                
+                writer.add_scalar('train/policy_loss_actor0', policy_loss_actor_sum[0] / episode_train_times, step)
+                writer.add_scalar('train/policy_loss_actor1', policy_loss_actor_sum[1] / episode_train_times, step)
+                writer.add_scalar('train/policy_loss_actor2', policy_loss_actor_sum[2] / episode_train_times, step)
+                writer.add_scalar('train/policy_loss_actor3', policy_loss_actor_sum[3] / episode_train_times, step)
+                writer.add_scalar('train/stroke_size_actor0', stroke_size_actor_sum[0] / episode_train_times, step)
+                writer.add_scalar('train/stroke_size_actor1', stroke_size_actor_sum[1] / episode_train_times, step)
+                writer.add_scalar('train/stroke_size_actor2', stroke_size_actor_sum[2] / episode_train_times, step)
+                writer.add_scalar('train/stroke_size_actor3', stroke_size_actor_sum[3] / episode_train_times, step)
+
                 if debug: prRed(f'Update policy - Q:{tot_Q / episode_train_times:.3f}, critic_loss:{tot_value_loss / episode_train_times:.3f}')
             if debug: prBlack('episode{}: steps:{} interval_time:{:.2f} train_time:{:.2f}' \
                 .format(episode, step, train_time_interval, time.time()-time_stamp)) 
