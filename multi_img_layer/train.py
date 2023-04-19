@@ -82,12 +82,12 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
                     lr = (3e-5, 1e-4)
                 # update policy
                 for _ in range(episode_train_times):
-                    policy_loss_sum, reg_stroke_size_sum, Q, value_loss, \
+                    policy_loss_sum, reg_stroke_size_mean, Q, value_loss, \
                         policy_loss_actors, stroke_size_actors = agent.update_policy(lr)
                     # __(policy_loss_sum) = pre_critic_output_sum + pre_gan_loss_sum
                     # Q, value_loss = agent.update_policy(lr)
                     tot_policy_loss += policy_loss_sum.data.cpu().numpy()
-                    tot_stroke_size += reg_stroke_size_sum.data.cpu().numpy()
+                    tot_stroke_size += reg_stroke_size_mean.data.cpu().numpy()
                     # tot_critic_output += pre_critic_output_sum.data.cpu().numpy()
                     # tot_gan_loss += pre_gan_loss_sum.data.cpu().numpy()
                     tot_Q += Q.data.cpu().numpy()

@@ -153,7 +153,7 @@ class Paint:
             curr_canvas = self.canvases_for_actors[self.current_actor_num]
             self.canvases_for_actors[self.current_actor_num] = (decode(action, curr_canvas.float() / 255) * 255).byte()
         self.stepnum += 1
-        self._select_current_actor(step + 1)
+        # self._select_current_actor(step + 1)
         ob = self.observation(self.current_actor_num)
         done = (self.stepnum == self.max_step)
         reward = self._cal_reward(self.current_actor_num) # np.array([0.] * self.batch_size)

@@ -99,8 +99,8 @@ class DDPG(object):
             # (lower bound, upper bound)
             (0.1, 99.0), # actor1. 用较粗的笔画画出图像中的远景 
             (0.1, 99.0), # actor2. 用较粗的笔画画出图像中的近景
-            (0.0, 0.2), # actor3. 用较细的笔画画出图像中的远景
-            (0.0, 0.2), # actor4. 用较细的笔画画出图像中的近景
+            (0.0, 0.5), # actor3. 用较细的笔画画出图像中的远景
+            (0.0, 0.5), # actor4. 用较细的笔画画出图像中的近景
         ]
 
         self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
@@ -254,7 +254,7 @@ class DDPG(object):
 
             reg_stroke_size = torch.max(torch.zeros_like(stroke_size), stroke_size - upper_bound)**2 + torch.max(torch.zeros_like(stroke_size), lower_bound - stroke_size)**2
 
-            actor_total_loss = policy_loss - self.lambda_stroke_size_reg * reg_stroke_size.mean()
+            actor_total_loss = policy_loss# + self.lambda_stroke_size_reg * reg_stroke_size.mean()
             # actor_total_loss = pre_critic_output + pre_gan_loss + a * reg_stroke_size
             self.actors[i].zero_grad()
             actor_total_loss.backward(retain_graph=True)
@@ -294,7 +294,7 @@ class DDPG(object):
         soft_update(self.critic_target, self.critic, self.tau)
 
          # Q, critic loss
-        return policy_loss_sum, reg_stroke_size_sum, tol_Q_sum, value_loss, \
+        return policy_loss_sum, reg_stroke_size_sum / self.ACTOR_NUM, tol_Q_sum, value_loss, \
             policy_loss_actors, stroke_size_actors
 
     def _compute_stroke_size(self, action):
