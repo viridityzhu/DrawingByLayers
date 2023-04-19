@@ -183,3 +183,4 @@ class Paint:
             self.current_actor_num = 2
         else:
             self.current_actor_num = 3
+        return self.current_actor_num
