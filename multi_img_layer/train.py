@@ -41,7 +41,7 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
             agent.reset(observation, noise_factor)    
         # action: 5 * strokes
         action = agent.select_action(observation, episode_steps, noise_factor=noise_factor)
-        observation, reward, done, _ = env.step(action, episode_steps)
+        observation, reward, done, _ = env.step(action, episode_steps) # reward not used
         agent.observe(reward, observation, done, episode_steps)
 
         if step % 200 == 0:
@@ -90,7 +90,7 @@ def train(agent: DDPG, env: fastenv, evaluate: Evaluator):
                     tot_stroke_size += reg_stroke_size_sum.data.cpu().numpy()
                     # tot_critic_output += pre_critic_output_sum.data.cpu().numpy()
                     # tot_gan_loss += pre_gan_loss_sum.data.cpu().numpy()
-                    tot_Q += torch.tensor(float(Q)).data.cpu().numpy()
+                    tot_Q += Q.data.cpu().numpy()
                     tot_value_loss += value_loss.data.cpu().numpy()
                     for i in range(4):
                         policy_loss_actor_sum[i] += policy_loss_actors[i].data.cpu().numpy()
