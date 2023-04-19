@@ -102,7 +102,7 @@ if __name__ == "__main__":
     parser.add_argument('--rmsize', default=800, type=int, help='replay memory size')
     parser.add_argument('--env_batch', default=96, type=int, help='concurrent environment number')
     parser.add_argument('--tau', default=0.001, type=float, help='moving average for target network')
-    parser.add_argument('--lambda_stroke_size_reg', default=0.5, type=float, help='weigh of stroke size regularization')
+    parser.add_argument('--lambda_stroke_size_reg', default=1, type=float, help='weigh of stroke size regularization')
     parser.add_argument('--actor_num', default=4, type=int, help='how many actors to use.')
     parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
     parser.add_argument('--noise_factor', default=0, type=float, help='noise level for parameter space noise')

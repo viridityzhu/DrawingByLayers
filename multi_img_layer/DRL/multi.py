@@ -28,9 +28,10 @@ class fastenv():
                 canvas = cv2.cvtColor((to_numpy(self.env.canvas[i].permute(1, 2, 0))), cv2.COLOR_BGR2RGB)
                 self.writer.add_image('img_{}/step_{}.png'.format(str(self.env.imgid[i]), str(step)), canvas, log)
                 # save the canvases for each actor
-                for j in range(self.ACTOR_NUM):
-                    canvas = cv2.cvtColor((to_numpy(self.env.canvases_for_actors[j][i].permute(1, 2, 0))), cv2.COLOR_BGR2RGB)
-                    self.writer.add_image('img_{}/actor_{}/step_{}.png'.format(str(self.env.imgid[i]), str(j), str(step)), canvas, log)
+                # for j in range(self.ACTOR_NUM):
+                actor_num = self.env._select_current_actor(step)
+                canvas = cv2.cvtColor((to_numpy(self.env.canvases_for_actors[actor_num][i].permute(1, 2, 0))), cv2.COLOR_BGR2RGB)
+                self.writer.add_image('img_{}/actor_{}/step_{}.png'.format(str(self.env.imgid[i]), str(actor_num), str(step)), canvas, log)
         if step == self.max_episode_length:
             for i in range(self.env_batch):
                 if self.env.imgid[i] < 50:

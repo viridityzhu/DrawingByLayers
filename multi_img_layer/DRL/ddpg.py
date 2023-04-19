@@ -104,8 +104,8 @@ class DDPG(object):
             (0.0, 0.2), # actor4. 用较细的笔画画出图像中的近景
         ]
 
-        self.critic = ResNet_wobn(3 + 10, 18, 1) # add the last canvas for better prediction
-        self.critic_target = ResNet_wobn(3 + 10, 18, 1) 
+        self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
+        self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
         self.critic_optim  = Adam(self.critic.parameters(), lr=1e-2)
 
         if (resume != None):
@@ -177,7 +177,7 @@ class DDPG(object):
         gan_reward = cal_reward(masked_canvas1, masked_gt) - cal_reward(masked_canvas0, masked_gt)
         # L2_reward = ((canvas0 - gt) ** 2).mean(1).mean(1).mean(1) - ((canvas1 - gt) ** 2).mean(1).mean(1).mean(1)        
         coord_ = coord.expand(state.shape[0], 2, 128, 128)
-        merged_state = torch.cat([canvas0, canvas1, gt, (T + 1).float() / self.max_step, mask, coord_], 1)
+        merged_state = torch.cat([masked_canvas0, masked_canvas1, masked_gt, (T + 1).float() / self.max_step, coord_], 1)
         # canvas0 is not necessarily added
         if target:
             Q = self.critic_target(merged_state)
@@ -299,11 +299,12 @@ class DDPG(object):
         return np.clip(action.astype('float32'), 0, 1)
     
     def _select_current_actor(self, step):
-        if step < 10:
+        actor_step_num = self.max_step // 10
+        if step < actor_step_num:
             self.current_actor_num = 0
-        elif step < 20:
+        elif step < actor_step_num * 2:
             self.current_actor_num = 1
-        elif step < 30:
+        elif step < actor_step_num * 6:
             self.current_actor_num = 2
         else:
             self.current_actor_num = 3
