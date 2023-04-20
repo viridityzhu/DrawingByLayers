@@ -151,12 +151,7 @@ class DDPG(object):
     def _update_gan(self, state):
         canvas = state[:, :3]
         gt = state[:, 3 : 6]
-        mask = state[:, 7 : 8]
-
-        # Apply the mask to the canvases and ground truth images
-        masked_canvas = canvas * mask
-        masked_gt = gt * mask
-        fake, real, penal = update(masked_canvas.float() / 255, masked_gt.float() / 255)
+        fake, real, penal = update(canvas.float() / 255, gt.float() / 255)
         if self.log % 20 == 0:
             self.writer.add_scalar('train/gan_fake', fake, self.log)
             self.writer.add_scalar('train/gan_real', real, self.log)
@@ -254,7 +249,7 @@ class DDPG(object):
 
             reg_stroke_size = torch.max(torch.zeros_like(stroke_size), stroke_size - upper_bound)**2 + torch.max(torch.zeros_like(stroke_size), lower_bound - stroke_size)**2
 
-            actor_total_loss = policy_loss# + self.lambda_stroke_size_reg * reg_stroke_size.mean()
+            actor_total_loss = policy_loss + self.lambda_stroke_size_reg * reg_stroke_size.mean()
             # actor_total_loss = pre_critic_output + pre_gan_loss + a * reg_stroke_size
             self.actors[i].zero_grad()
             actor_total_loss.backward(retain_graph=True)
