@@ -127,7 +127,8 @@ actor.load_state_dict(torch.load(args.actor))
 actor = actor.to(device).eval()
 Decoder = Decoder.to(device).eval()
 
-canvas = torch.zeros([1, 3, width, width]).to(device)
+canvas_foreground = torch.zeros([1, 3, width, width]).to(device)
+canvas_background = torch.zeros([1, 3, width, width]).to(device)
 '''
 0. 远景，粗笔画
 1. 近景，粗笔画
@@ -189,9 +190,9 @@ with torch.no_grad():
     # 1. 远景，粗笔画
     for i in range(args.max_step // 2):
         stepnum = T * i / args.max_step
-        actions = actor(torch.cat([canvas, img_background, stepnum, coord], 1))
+        actions = actor(torch.cat([canvas_background, img_background, stepnum, coord], 1))
 
-        canvas = draw_on_canvas(i, actions, canvas, img_background, 0, 'full')
+        canvas_background = draw_on_canvas(i, actions, canvas_background, img_background, 0, 'full')
         canvas_layers[0] = draw_on_canvas(i, actions, canvas_layers[0], img_background, 1, 'background_rough')
         canvas_layers[4] = draw_on_canvas(i, actions, canvas_layers[4], img_background, 5, 'style_blur_background')
         canvas_layers[7] = draw_on_canvas(i, actions, canvas_layers[7], img_background, 8, 'style_only_background')
@@ -200,27 +201,43 @@ with torch.no_grad():
     # 2. 近景，粗笔画
     for i in range(args.max_step // 2, args.max_step):
         stepnum = T * i / args.max_step
-        actions = actor(torch.cat([canvas, img_foreground, stepnum, coord], 1))
-        canvas = draw_on_canvas(i, actions, canvas, img_foreground, 0, 'full')
+        actions = actor(torch.cat([canvas_foreground, img_foreground, stepnum, coord], 1))
+        canvas_foreground = draw_on_canvas(i, actions, canvas_foreground, img_foreground, 0, 'full')
         canvas_layers[1] = draw_on_canvas(i, actions, canvas_layers[1], img_foreground, 2, 'foreground_rough')
         canvas_layers[5] = draw_on_canvas(i, actions, canvas_layers[5], img_foreground, 6, 'style_blur_foreground')
         canvas_layers[6] = draw_on_canvas(i, actions, canvas_layers[6], img_foreground, 7, 'style_only_foreground')
         canvas_layers[8] = draw_on_canvas(i, actions, canvas_layers[8], img_foreground, 9, 'style_only_coarse')
 
     if args.divide != 1:
-        canvas = canvas[0].detach().cpu().numpy()
-        canvas = np.transpose(canvas, (1, 2, 0))    
-        canvas = cv2.resize(canvas, (width * args.divide, width * args.divide))
-        canvas = large2small(canvas)
-        canvas = np.transpose(canvas, (0, 3, 1, 2))
-        canvas = torch.tensor(canvas).to(device).float()
+        canvas_foreground = canvas_foreground[0].detach().cpu().numpy()
+        canvas_foreground = np.transpose(canvas_foreground, (1, 2, 0))    
+        canvas_foreground = cv2.resize(canvas_foreground, (width * args.divide, width * args.divide))
+        canvas_foreground = large2small(canvas_foreground)
+        canvas_foreground = np.transpose(canvas_foreground, (0, 3, 1, 2))
+        canvas_foreground = torch.tensor(canvas_foreground).to(device).float()
+        canvas_background = canvas_background[0].detach().cpu().numpy()
+        canvas_background = np.transpose(canvas_background, (1, 2, 0))    
+        canvas_background = cv2.resize(canvas_background, (width * args.divide, width * args.divide))
+        canvas_background = large2small(canvas_background)
+        canvas_background = np.transpose(canvas_background, (0, 3, 1, 2))
+        canvas_background = torch.tensor(canvas_background).to(device).float()
+        layer_list = [4, 5, 6, 7, 9]
+        for l in layer_list:
+            canvas_layers[l] = canvas_layers[l][0].detach().cpu().numpy()
+            canvas_layers[l] = np.transpose(canvas_layers[l], (1, 2, 0))    
+            canvas_layers[l] = cv2.resize(canvas_layers[l], (width * args.divide, width * args.divide))
+            canvas_layers[l] = large2small(canvas_layers[l])
+            canvas_layers[l] = np.transpose(canvas_layers[l], (0, 3, 1, 2))
+            canvas_layers[l] = torch.tensor(canvas_layers[l]).to(device).float()
+
+            
         coord = coord.expand(canvas_cnt, 2, width, width)
         T = T.expand(canvas_cnt, 1, width, width)
         # 3. 远景，细笔画
         for i in range(args.max_step // 2):
             stepnum = T * i / args.max_step
-            actions = actor(torch.cat([canvas, patch_img_background, stepnum, coord], 1))
-            canvas = draw_on_canvas(i, actions, canvas, patch_img_background, 0, 'full', divide=True)
+            actions = actor(torch.cat([canvas_background, patch_img_background, stepnum, coord], 1))
+            canvas_background = draw_on_canvas(i, actions, canvas_background, patch_img_background, 0, 'full', divide=True)
             canvas_layers[2] = draw_on_canvas(i, actions, canvas_layers[2], patch_img_background, 3, 'background_fine', divide=True)
             canvas_layers[4] = draw_on_canvas(i, actions, canvas_layers[4], patch_img_background, 5, 'style_blur_background', divide=True)
             canvas_layers[5] = draw_on_canvas(i, actions, canvas_layers[5], patch_img_background, 6, 'style_blur_foreground', divide=True)
@@ -229,8 +246,8 @@ with torch.no_grad():
         # 4. 近景，细笔画
         for i in range(args.max_step // 2, args.max_step):
             stepnum = T * i / args.max_step
-            actions = actor(torch.cat([canvas, patch_img_foreground, stepnum, coord], 1))
-            canvas = draw_on_canvas(i, actions, canvas, patch_img_foreground, 0, 'full', divide=True)
+            actions = actor(torch.cat([canvas_foreground, patch_img_foreground, stepnum, coord], 1))
+            canvas_foreground = draw_on_canvas(i, actions, canvas_foreground, patch_img_foreground, 0, 'full', divide=True)
             canvas_layers[3] = draw_on_canvas(i, actions, canvas_layers[3], patch_img_foreground, 4, 'foreground_fine', divide=True)
             canvas_layers[4] = draw_on_canvas(i, actions, canvas_layers[4], patch_img_foreground, 5, 'style_blur_background', divide=True)
             canvas_layers[5] = draw_on_canvas(i, actions, canvas_layers[5], patch_img_foreground, 6, 'style_blur_foreground', divide=True)
