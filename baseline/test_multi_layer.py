@@ -189,10 +189,9 @@ patch_img_foreground = patch_img * patch_mask
 os.system('mkdir output')
 
 with torch.no_grad():
-    if args.divide != 1:
-        args.max_step = args.max_step // 2
+    step_div = [args.max_step // 8 * 1, args.max_step // 8 * 2, args.max_step // 8 * 5, args.max_step]
     # 1. 远景，粗笔画
-    for i in range(args.max_step // 2):
+    for i in range(step_div[0]):
         stepnum = T * i / args.max_step
         actions = actor(torch.cat([canvas_background, img_background, stepnum, coord], 1))
 
@@ -205,7 +204,7 @@ with torch.no_grad():
         canvas_layers[8] = draw_on_canvas(i, actions, canvas_layers[8], img_background, mask_opposite, 9, 'style_only_coarse')
         
     # 2. 近景，粗笔画
-    for i in range(args.max_step // 2, args.max_step):
+    for i in range(step_div[0], step_div[1]):
         stepnum = T * i / args.max_step
         actions = actor(torch.cat([canvas_foreground, img_foreground, stepnum, coord], 1))
         canvas_foreground = draw_on_canvas(i, actions, canvas_foreground, img_foreground, mask, 0, None)
@@ -248,7 +247,7 @@ with torch.no_grad():
         coord = coord.expand(canvas_cnt, 2, width, width)
         T = T.expand(canvas_cnt, 1, width, width)
         # 3. 远景，细笔画
-        for i in range(args.max_step // 2):
+        for i in range(step_div[1], step_div[2]):
             stepnum = T * i / args.max_step
             actions = actor(torch.cat([canvas_background, patch_img_background, stepnum, coord], 1))
             canvas_background = draw_on_canvas(i, actions, canvas_background, patch_img_background, patch_mask_opposite, 0, None, divide=True)
@@ -258,7 +257,7 @@ with torch.no_grad():
             canvas_layers[7] = draw_on_canvas(i, actions, canvas_layers[7], patch_img_background, patch_mask_opposite, 8, 'style_only_background', divide=True)
             canvas_layers[9] = draw_on_canvas(i, actions, canvas_layers[9], patch_img_background, patch_mask_opposite, 10, 'style_only_fine', divide=True)
         # 4. 近景，细笔画
-        for i in range(args.max_step // 2, args.max_step):
+        for i in range(step_div[2], step_div[3]):
             stepnum = T * i / args.max_step
             actions = actor(torch.cat([canvas_foreground, patch_img_foreground, stepnum, coord], 1))
             canvas_foreground = draw_on_canvas(i, actions, canvas_foreground, patch_img_foreground, patch_mask, 0, None, divide=True)
