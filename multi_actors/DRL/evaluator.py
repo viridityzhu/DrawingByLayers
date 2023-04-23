@@ -10,7 +10,7 @@ class Evaluator(object):
         self.writer = writer
         self.log = 0
 
-    def __call__(self, env, policy, debug=False):        
+    def __call__(self, env, policy, agent_num, debug=False):        
         observation = None
         for episode in range(self.validate_episodes):
             # reset at the start of episode
@@ -25,7 +25,7 @@ class Evaluator(object):
                 observation, reward, done, (step_num) = env.step(action)
                 episode_reward += reward
                 episode_steps += 1
-                env.save_image(self.log, episode_steps)
+                env.save_image(self.log, episode_steps, agent_num)
             dist = env.get_dist()
             self.log += 1
         return episode_reward, dist

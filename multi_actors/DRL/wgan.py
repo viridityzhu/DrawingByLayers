@@ -76,9 +76,9 @@ def cal_gradient_penalty(netD, real_data, fake_data, batch_size):
 def cal_reward(fake_data, real_data):
     return target_netD(torch.cat([real_data, fake_data], 1))
 
-def save_gan(path):
+def save_gan(path, i):
     netD.cpu()
-    torch.save(netD.state_dict(),'{}/wgan.pkl'.format(path))
+    torch.save(netD.state_dict(),'{}/wgan_{}.pkl'.format(path, i))
     netD.to(device)
 
 def load_gan(path):

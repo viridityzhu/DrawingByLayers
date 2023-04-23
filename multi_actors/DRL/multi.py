@@ -20,18 +20,18 @@ class fastenv():
         self.test = False
         self.log = 0
 
-    def save_image(self, log, step):
+    def save_image(self, log, step, agent_num):
         for i in range(self.env_batch):
             if self.env.imgid[i] <= 10:
                 canvas = cv2.cvtColor((to_numpy(self.env.canvas[i].permute(1, 2, 0))), cv2.COLOR_BGR2RGB)
-                self.writer.add_image('{}/canvas_{}.png'.format(str(self.env.imgid[i]), str(step)), canvas, log)
+                self.writer.add_image('img_{}/actor_{}/step_{}.png'.format(str(self.env.imgid[i]), str(agent_num), str(step)), canvas, log)
         if step == self.max_episode_length:
             for i in range(self.env_batch):
                 if self.env.imgid[i] < 50:
                     gt = cv2.cvtColor((to_numpy(self.env.gt[i].permute(1, 2, 0))), cv2.COLOR_BGR2RGB)
                     canvas = cv2.cvtColor((to_numpy(self.env.canvas[i].permute(1, 2, 0))), cv2.COLOR_BGR2RGB)
-                    self.writer.add_image(str(self.env.imgid[i]) + '/_target.png', gt, log)
-                    self.writer.add_image(str(self.env.imgid[i]) + '/_canvas.png', canvas, log)
+                    self.writer.add_image('img_' + str(self.env.imgid[i]) + '/actor_' + str(agent_num) + '/target.png', gt, log)
+                    self.writer.add_image('img_' + str(self.env.imgid[i]) + '/actor_' + str(agent_num) + '/final_canvas.png', canvas, log)
     
     def step(self, action):
         with torch.no_grad():

@@ -1,4 +1,5 @@
 import PIL
+from PIL import Image
 import scipy.misc
 from io import BytesIO
 import tensorboardX as tb
@@ -17,7 +18,8 @@ class TensorBoard(object):
         elif type(img) == PIL.Image.Image:
             pass
         else:
-            img = scipy.misc.toimage(img)
+            # img = scipy.misc.toimage(img)
+            img = Image.fromarray(img)
 
         img.save(bio, format="png")
         image_summary = Summary.Image(encoded_image_string=bio.getvalue())

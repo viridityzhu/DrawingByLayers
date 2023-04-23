@@ -4,16 +4,19 @@ import random
 import numpy as np
 import argparse
 from DRL.evaluator import Evaluator
+from DRL.ddpg import DDPG
+from DRL.multi import fastenv
 from utils.util import *
 from utils.tensorboard import TensorBoard
 import time
 
-exp = os.path.abspath('.').split('/')[-1]
+exp = str(os.path.basename(os.getcwd())) + '_' + str(time.time())
+# exp = os.path.abspath('.').split('/')[-1]
 writer = TensorBoard('../train_log/{}'.format(exp))
 os.system('ln -sf ../train_log/{} ./log'.format(exp))
 os.system('mkdir ./model')
 
-def train(agent, env, evaluate):
+def train(agent0, agent1, env0, env1, evaluate):
     train_times = args.train_times
     env_batch = args.env_batch
     validate_interval = args.validate_interval
@@ -25,52 +28,84 @@ def train(agent, env, evaluate):
     time_stamp = time.time()
     step = episode = episode_steps = 0
     tot_reward = 0.
-    observation = None
+    observation_fore = None
+    observation_back = None
     noise_factor = args.noise_factor
     while step <= train_times:
         step += 1
         episode_steps += 1
         # reset if it is the start of episode
-        if observation is None:
-            observation = env.reset()
-            agent.reset(observation, noise_factor)    
-        action = agent.select_action(observation, episode_steps, noise_factor=noise_factor)
-        observation, reward, done, _ = env.step(action)
-        agent.observe(reward, observation, done, step)
+        if observation_fore is None:
+            observation_fore = env0.reset(0)
+            agent0.reset(observation_fore, noise_factor)    
+            observation_back = env1.reset(1)
+            agent1.reset(observation_back, noise_factor)
+
+        action = agent0.select_action(observation_fore, episode_steps, noise_factor=noise_factor)
+        observation_fore, reward, done, _ = env0.step(action)
+        agent0.observe(reward, observation_fore, done, step)
+        
+        action = agent1.select_action(observation_fore, episode_steps, noise_factor=noise_factor)
+        observation_fore, reward, done, _ = env1.step(action)
+        agent1.observe(reward, observation_fore, done, step)
+        
+        if step % 200 == 0:
+            print('step: {}, episode: {}, episode_steps: {}, reward: {}'.format(step, episode, episode_steps, reward.mean()))
+
+        # every 40 steps, update policy and reset the environment
         if (episode_steps >= max_step and max_step):
             if step > args.warmup:
                 # [optional] evaluate
                 if episode > 0 and validate_interval > 0 and episode % validate_interval == 0:
-                    reward, dist = evaluate(env, agent.select_action, debug=debug)
-                    if debug: prRed('Step_{:07d}: mean_reward:{:.3f} mean_dist:{:.3f} var_dist:{:.3f}'.format(step - 1, np.mean(reward), np.mean(dist), np.var(dist)))
-                    writer.add_scalar('validate/mean_reward', np.mean(reward), step)
-                    writer.add_scalar('validate/mean_dist', np.mean(dist), step)
-                    writer.add_scalar('validate/var_dist', np.var(dist), step)
-                    agent.save_model(output)
+                    reward0, dist0 = evaluate(env0, agent0.select_action, agent_num=0, debug=debug)
+                    if debug: prRed('Step_{:07d}: mean_reward0:{:.3f} mean_dist0:{:.3f} var_dist0:{:.3f}'.format(step - 1, np.mean(reward0), np.mean(dist0), np.var(dist0)))
+                    writer.add_scalar('validate/mean_reward0', np.mean(reward0), step)
+                    writer.add_scalar('validate/mean_dist0', np.mean(dist0), step)
+                    writer.add_scalar('validate/var_dist0', np.var(dist0), step)
+                    agent0.save_model(output, 0)
+                    
+                    reward1, dist1 = evaluate(env1, agent1.select_action, agent_num=1, debug=debug)
+                    if debug: prRed('Step_{:07d}: mean_reward1:{:.3f} mean_dist1:{:.3f} var_dist1:{:.3f}'.format(step - 1, np.mean(reward1), np.mean(dist1), np.var(dist1)))
+                    writer.add_scalar('validate/mean_reward1', np.mean(reward1), step)
+                    writer.add_scalar('validate/mean_dist1', np.mean(dist1), step)
+                    writer.add_scalar('validate/var_dist1', np.var(dist1), step)
+                    agent1.save_model(output, 1)
+
             train_time_interval = time.time() - time_stamp
             time_stamp = time.time()
-            tot_Q = 0.
-            tot_value_loss = 0.
+            tot_Q0 = 0.
+            tot_Q1 = 0.
+            tot_value_loss0 = 0.
+            tot_value_loss1 = 0.
             if step > args.warmup:
+                # adjust learning rate
                 if step < 10000 * max_step:
-                    lr = (3e-4, 1e-3)
+                    lr = (3e-4, 1e-3) # lr for critic, lr for actor
                 elif step < 20000 * max_step:
                     lr = (1e-4, 3e-4)
                 else:
                     lr = (3e-5, 1e-4)
+                # update policy
                 for i in range(episode_train_times):
-                    Q, value_loss = agent.update_policy(lr)
-                    tot_Q += Q.data.cpu().numpy()
-                    tot_value_loss += value_loss.data.cpu().numpy()
+                    Q0, value_loss0 = agent0.update_policy(lr)
+                    tot_Q0 += Q0.data.cpu().numpy()
+                    tot_value_loss0 += value_loss0.data.cpu().numpy()
+                    
+                    Q1, value_loss1 = agent1.update_policy(lr)
+                    tot_Q1 += Q1.data.cpu().numpy()
+                    tot_value_loss1 += value_loss1.data.cpu().numpy()
                 writer.add_scalar('train/critic_lr', lr[0], step)
                 writer.add_scalar('train/actor_lr', lr[1], step)
-                writer.add_scalar('train/Q', tot_Q / episode_train_times, step)
-                writer.add_scalar('train/critic_loss', tot_value_loss / episode_train_times, step)
+                writer.add_scalar('train/Q0', tot_Q0 / episode_train_times, step)
+                writer.add_scalar('train/Q1', tot_Q1 / episode_train_times, step)
+                writer.add_scalar('train/critic_loss0', tot_value_loss0 / episode_train_times, step)
+                writer.add_scalar('train/critic_loss1', tot_value_loss1 / episode_train_times, step)
             if debug: prBlack('#{}: steps:{} interval_time:{:.2f} train_time:{:.2f}' \
                 .format(episode, step, train_time_interval, time.time()-time_stamp)) 
             time_stamp = time.time()
             # reset
-            observation = None
+            observation_fore = None
+            observation_back = None
             episode_steps = 0
             episode += 1
     
@@ -87,7 +122,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
     parser.add_argument('--noise_factor', default=0, type=float, help='noise level for parameter space noise')
     parser.add_argument('--validate_interval', default=50, type=int, help='how many episodes to perform a validation')
-    parser.add_argument('--validate_episodes', default=5, type=int, help='how many episode to perform during validation')
+    parser.add_argument('--validate_episodes', default=1, type=int, help='how many episode to perform during validation') # 5
     parser.add_argument('--train_times', default=2000000, type=int, help='total traintimes')
     parser.add_argument('--episode_train_times', default=10, type=int, help='train times for each episode')    
     parser.add_argument('--resume', default=None, type=str, help='Resuming model path for testing')
@@ -109,6 +144,10 @@ if __name__ == "__main__":
     agent = DDPG(args.batch_size, args.env_batch, args.max_step, \
                  args.tau, args.discount, args.rmsize, \
                  writer, args.resume, args.output)
+    fenv1 = fastenv(args.max_step, args.env_batch, writer)
+    agent1 = DDPG(args.batch_size, args.env_batch, args.max_step, \
+                 args.tau, args.discount, args.rmsize, \
+                 writer, args.resume, args.output)
     evaluate = Evaluator(args, writer)
     print('observation_space', fenv.observation_space, 'action_space', fenv.action_space)
-    train(agent, fenv, evaluate)
+    train(agent, agent1, fenv, fenv1, evaluate)

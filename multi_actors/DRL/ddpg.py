@@ -154,10 +154,10 @@ class DDPG(object):
         return -policy_loss, value_loss
 
     def observe(self, reward, state, done, step):
-        s0 = torch.tensor(self.state, device='cpu')
+        s0 = self.state.to(device='cpu')
         a = to_tensor(self.action, "cpu")
         r = to_tensor(reward, "cpu")
-        s1 = torch.tensor(state, device='cpu')
+        s1 = state.to(device='cpu')
         d = to_tensor(done.astype('float32'), "cpu")
         for i in range(self.env_batch):
             self.memory.append([s0[i], a[i], r[i], s1[i], d[i]])
@@ -192,12 +192,12 @@ class DDPG(object):
         self.critic.load_state_dict(torch.load('{}/critic.pkl'.format(path)))
         load_gan(path)
         
-    def save_model(self, path):
+    def save_model(self, path, i):
         self.actor.cpu()
         self.critic.cpu()
-        torch.save(self.actor.state_dict(),'{}/actor.pkl'.format(path))
-        torch.save(self.critic.state_dict(),'{}/critic.pkl'.format(path))
-        save_gan(path)
+        torch.save(self.actor.state_dict(),'{}/actor_{}.pkl'.format(path, i))
+        torch.save(self.critic.state_dict(),'{}/critic_{}.pkl'.format(path, i))
+        save_gan(path, i)
         self.choose_device()
 
     def eval(self):
