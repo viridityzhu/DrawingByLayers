@@ -15,7 +15,7 @@ width = 128
 
 parser = argparse.ArgumentParser(description='Learning to Paint')
 parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
-parser.add_argument('--actor', default='./model/Paint-run10/actor_0.pkl', type=str, help='Actor model')
+parser.add_argument('--actor', default='./model/Paint-run25/actor_0.pkl', type=str, help='Actor model')
 parser.add_argument('--renderer', default='../renderer.pkl', type=str, help='renderer model')
 parser.add_argument('--img', default='../data/origin_img/4.jpg', type=str, help='test image')
 parser.add_argument('--msk', default='../data/merged_mask/00004.png', type=str, help='mask image')

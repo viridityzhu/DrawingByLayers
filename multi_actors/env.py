@@ -39,7 +39,7 @@ class Paint:
         loads data from CelebA dataset and separates it into training and testing sets.
         '''
         global train_num, test_num
-        for i in range(30000):
+        for i in range(2000):
             img_id0 = str(i)
             img_id = '%05d' % i
             try:
@@ -48,7 +48,7 @@ class Paint:
                 _, msk = cv2.threshold(msk, 127, 1, cv2.THRESH_BINARY)
                 img = cv2.resize(img, (width, width))
                 msk = cv2.resize(msk, (width, width))
-                if i >= 2000:                
+                if i >= 100:                
                     train_num += 1
                     img_train.append(img)
                     msk_train.append(msk)

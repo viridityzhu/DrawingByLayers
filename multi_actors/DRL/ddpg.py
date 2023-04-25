@@ -42,16 +42,20 @@ def cal_trans(s, t):
 class DDPG(object):
     def __init__(self, batch_size=64, env_batch=1, max_step=40, \
                  tau=0.001, discount=0.9, rmsize=800, \
-                 writer=None, resume=None, output_path=None):
+                 writer=None, resume=None, agent_num=0, output_path=None):
 
         self.max_step = max_step
         self.env_batch = env_batch
         self.batch_size = batch_size        
 
         self.actor = ResNet(9, 18, 65) # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
-        self.actor_target = ResNet(9, 18, 65)
+        self.actor.load_state_dict(torch.load('../actor.pkl'))
+        self.actor_target = ResNet(9, 18, 65) # action_bundle = 5, 65 = 5 * 13
+        self.actor_target.load_state_dict(torch.load('../actor.pkl'))
         self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
         self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
+        self.critic.load_state_dict(torch.load('./model/Paint-run18/critic_' + str(agent_num) + '.pkl'))
+        self.critic_target.load_state_dict(torch.load('./model/Paint-run18/critic_' + str(agent_num) + '.pkl'))
 
         self.actor_optim  = Adam(self.actor.parameters(), lr=1e-2)
         self.critic_optim  = Adam(self.critic.parameters(), lr=1e-2)

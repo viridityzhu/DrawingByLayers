@@ -143,11 +143,11 @@ if __name__ == "__main__":
     fenv = fastenv(args.max_step, args.env_batch, writer)
     agent = DDPG(args.batch_size, args.env_batch, args.max_step, \
                  args.tau, args.discount, args.rmsize, \
-                 writer, args.resume, args.output)
+                 writer, args.resume, 0, args.output)
     fenv1 = fastenv(args.max_step, args.env_batch, writer)
     agent1 = DDPG(args.batch_size, args.env_batch, args.max_step, \
                  args.tau, args.discount, args.rmsize, \
-                 writer, args.resume, args.output)
+                 writer, args.resume, 1, args.output)
     evaluate = Evaluator(args, writer)
     print('observation_space', fenv.observation_space, 'action_space', fenv.action_space)
     train(agent, agent1, fenv, fenv1, evaluate)

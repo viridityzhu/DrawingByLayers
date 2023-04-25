@@ -35,12 +35,14 @@ class Paint:
     def load_data(self):
         # CelebA
         global train_num, test_num
-        for i in range(200000):
+        for i in range(2000):
             img_id = '%06d' % (i + 1)
+            img_id0 = str(i)
             try:
-                img = cv2.imread('./data/img_align_celeba/' + img_id + '.jpg', cv2.IMREAD_UNCHANGED)
+                # img = cv2.imread('./data/img_align_celeba/' + img_id + '.jpg', cv2.IMREAD_UNCHANGED)
+                img = cv2.imread('../data/origin_img/' + img_id0 + '.jpg', cv2.IMREAD_UNCHANGED)
                 img = cv2.resize(img, (width, width))
-                if i > 2000:                
+                if i >= 200:                
                     train_num += 1
                     img_train.append(img)
                 else:

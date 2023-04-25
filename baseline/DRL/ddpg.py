@@ -49,7 +49,9 @@ class DDPG(object):
         self.batch_size = batch_size        
 
         self.actor = ResNet(9, 18, 65) # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
+        self.actor.load_state_dict(torch.load('../actor.pkl'))
         self.actor_target = ResNet(9, 18, 65)
+        self.actor.load_state_dict(torch.load('../actor.pkl'))
         self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
         self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
 

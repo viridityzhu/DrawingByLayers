@@ -15,7 +15,7 @@ width = 128
 
 parser = argparse.ArgumentParser(description='Learning to Paint')
 parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
-parser.add_argument('--actor', default='./model/Paint-run1/actor.pkl', type=str, help='Actor model')
+parser.add_argument('--actor', default='./actor.pkl', type=str, help='Actor model')
 parser.add_argument('--renderer', default='./renderer.pkl', type=str, help='renderer model')
 parser.add_argument('--img', default='image/test.png', type=str, help='test image')
 parser.add_argument('--imgid', default=0, type=int, help='set begin number for generated image')
@@ -97,7 +97,7 @@ def save_img(res, imgid, divide=False):
         output = output[0]
     output = (output * 255).astype('uint8')
     output = cv2.resize(output, origin_shape)
-    cv2.imwrite('output/generated' + str(imgid) + '.png', output)
+    cv2.imwrite('output_baseline/generated' + str(imgid) + '.png', output)
 
 actor = ResNet(9, 18, 65) # action_bundle = 5, 65 = 5 * 13
 actor.load_state_dict(torch.load(args.actor))
@@ -116,7 +116,7 @@ img = img.reshape(1, width, width, 3)
 img = np.transpose(img, (0, 3, 1, 2))
 img = torch.tensor(img).to(device).float() / 255.
 
-os.system('mkdir output')
+os.system('mkdir output_baseline')
 
 with torch.no_grad():
     if args.divide != 1:
