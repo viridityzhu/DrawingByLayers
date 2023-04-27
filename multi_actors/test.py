@@ -15,10 +15,10 @@ width = 128
 
 parser = argparse.ArgumentParser(description='Learning to Paint')
 parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
-parser.add_argument('--actor', default='./model/Paint-run25/actor_0.pkl', type=str, help='Actor model')
+parser.add_argument('--actor', default='./model/Paint-run32/actor_1.pkl', type=str, help='Actor model')
 parser.add_argument('--renderer', default='../renderer.pkl', type=str, help='renderer model')
-parser.add_argument('--img', default='../data/origin_img/4.jpg', type=str, help='test image')
-parser.add_argument('--msk', default='../data/merged_mask/00004.png', type=str, help='mask image')
+parser.add_argument('--img', default='../data/origin_img/450.jpg', type=str, help='test image')
+parser.add_argument('--msk', default='../data/merged_mask/00450.png', type=str, help='mask image')
 parser.add_argument('--imgid', default=0, type=int, help='set begin number for generated image')
 parser.add_argument('--divide', default=4, type=int, help='divide the target image to get better resolution')
 args = parser.parse_args()
@@ -37,7 +37,7 @@ msk = msk[..., np.newaxis]
 print(img.shape, msk.shape)
 msk0 = torch.tensor(msk)
 msk1 = torch.logical_not(msk0).int()
-img2 = torch.tensor(img).float() * msk0
+img2 = torch.tensor(img).float() * msk1
 img = img2.numpy()
 
 coord = torch.zeros([1, 2, width, width])
@@ -47,6 +47,7 @@ for i in range(width):
         coord[0, 1, i, j] = j / (width - 1.)
 coord = coord.to(device) # Coordconv
 
+# load renderer
 Decoder = FCN()
 Decoder.load_state_dict(torch.load(args.renderer))
 

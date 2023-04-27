@@ -36,18 +36,18 @@ def train(agent0, agent1, env0, env1, evaluate):
         episode_steps += 1
         # reset if it is the start of episode
         if observation_fore is None:
-            observation_fore = env0.reset(0)
+            observation_fore = env0.reset()
             agent0.reset(observation_fore, noise_factor)    
-            observation_back = env1.reset(1)
+            observation_back = env1.reset()
             agent1.reset(observation_back, noise_factor)
 
         action = agent0.select_action(observation_fore, episode_steps, noise_factor=noise_factor)
         observation_fore, reward, done, _ = env0.step(action)
         agent0.observe(reward, observation_fore, done, step)
         
-        action = agent1.select_action(observation_fore, episode_steps, noise_factor=noise_factor)
-        observation_fore, reward, done, _ = env1.step(action)
-        agent1.observe(reward, observation_fore, done, step)
+        action = agent1.select_action(observation_back, episode_steps, noise_factor=noise_factor)
+        observation_back, reward, done, _ = env1.step(action)
+        agent1.observe(reward, observation_back, done, step)
         
         if step % 200 == 0:
             print('step: {}, episode: {}, episode_steps: {}, reward: {}'.format(step, episode, episode_steps, reward.mean()))
@@ -140,14 +140,14 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
     from DRL.ddpg import DDPG
     from DRL.multi import fastenv
-    fenv = fastenv(args.max_step, args.env_batch, writer)
+    fenv = fastenv(args.max_step, args.env_batch, 0, writer)
     agent = DDPG(args.batch_size, args.env_batch, args.max_step, \
                  args.tau, args.discount, args.rmsize, \
-                 writer, args.resume, 0, args.output)
-    fenv1 = fastenv(args.max_step, args.env_batch, writer)
+                 writer, args.resume, args.output)
+    fenv1 = fastenv(args.max_step, args.env_batch, 1, writer)
     agent1 = DDPG(args.batch_size, args.env_batch, args.max_step, \
                  args.tau, args.discount, args.rmsize, \
-                 writer, args.resume, 1, args.output)
+                 writer, args.resume, args.output)
     evaluate = Evaluator(args, writer)
     print('observation_space', fenv.observation_space, 'action_space', fenv.action_space)
     train(agent, agent1, fenv, fenv1, evaluate)
