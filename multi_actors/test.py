@@ -15,9 +15,10 @@ width = 128
 
 parser = argparse.ArgumentParser(description='Learning to Paint')
 parser.add_argument('--max_step', default=40, type=int, help='max length for episode')
-parser.add_argument('--actor', default='./actor.pkl', type=str, help='Actor model')
-parser.add_argument('--renderer', default='./renderer.pkl', type=str, help='renderer model')
-parser.add_argument('--img', default='image/test.png', type=str, help='test image')
+parser.add_argument('--actor', default='./model/Paint-run32/actor_1.pkl', type=str, help='Actor model')
+parser.add_argument('--renderer', default='../renderer.pkl', type=str, help='renderer model')
+parser.add_argument('--img', default='../data/origin_img/450.jpg', type=str, help='test image')
+parser.add_argument('--msk', default='../data/merged_mask/00450.png', type=str, help='mask image')
 parser.add_argument('--imgid', default=0, type=int, help='set begin number for generated image')
 parser.add_argument('--divide', default=4, type=int, help='divide the target image to get better resolution')
 args = parser.parse_args()
@@ -25,7 +26,19 @@ args = parser.parse_args()
 canvas_cnt = args.divide * args.divide
 T = torch.ones([1, 1, width, width], dtype=torch.float32).to(device)
 img = cv2.imread(args.img, cv2.IMREAD_COLOR)
+msk = cv2.imread(args.msk, cv2.IMREAD_GRAYSCALE)
 origin_shape = (img.shape[1], img.shape[0])
+
+img = cv2.resize(img, (width, width))
+msk = cv2.resize(msk, (width, width))
+_, msk = cv2.threshold(msk, 127, 1, cv2.THRESH_BINARY)
+
+msk = msk[..., np.newaxis]
+print(img.shape, msk.shape)
+msk0 = torch.tensor(msk)
+msk1 = torch.logical_not(msk0).int()
+img2 = torch.tensor(img).float() * msk1
+img = img2.numpy()
 
 coord = torch.zeros([1, 2, width, width])
 for i in range(width):
@@ -34,6 +47,7 @@ for i in range(width):
         coord[0, 1, i, j] = j / (width - 1.)
 coord = coord.to(device) # Coordconv
 
+# load renderer
 Decoder = FCN()
 Decoder.load_state_dict(torch.load(args.renderer))
 
@@ -143,6 +157,8 @@ with torch.no_grad():
             actions = actor(torch.cat([canvas, patch_img, stepnum, coord], 1))
             canvas, res = decode(actions, canvas)
             print('divided canvas step {}, L2Loss = {}'.format(i, ((canvas - patch_img) ** 2).mean()))
-            for j in range(5):
-                save_img(res[j], args.imgid, True)
-                args.imgid += 1
+            # for j in range(5):
+            #     save_img(res[j], args.imgid, True)
+            #     args.imgid += 1
+            save_img(res[4], args.imgid, True)
+            args.imgid += 5

@@ -49,11 +49,13 @@ class DDPG(object):
         self.batch_size = batch_size        
 
         self.actor = ResNet(9, 18, 65) # target, canvas, stepnum, coordconv 3 + 3 + 1 + 2
-        self.actor.load_state_dict(torch.load('../actor.pkl'))
-        self.actor_target = ResNet(9, 18, 65)
-        self.actor.load_state_dict(torch.load('../actor.pkl'))
+        self.actor.load_state_dict(torch.load('../actor.pkl')) # (torch.load('./model/Paint-run32/actor_1.pkl'))
+        self.actor_target = ResNet(9, 18, 65) # action_bundle = 5, 65 = 5 * 13
+        self.actor_target.load_state_dict(torch.load('../actor.pkl')) # (torch.load('./model/Paint-run32/actor_1.pkl'))
         self.critic = ResNet_wobn(3 + 9, 18, 1) # add the last canvas for better prediction
         self.critic_target = ResNet_wobn(3 + 9, 18, 1) 
+        self.critic.load_state_dict(torch.load('../baseline/model/Paint-run4/critic.pkl')) # (torch.load('./model/Paint-run32/critic_1.pkl'))
+        self.critic_target.load_state_dict(torch.load('../baseline/model/Paint-run4/critic.pkl')) # (torch.load('./model/Paint-run32/critic_1.pkl'))
 
         self.actor_optim  = Adam(self.actor.parameters(), lr=1e-2)
         self.critic_optim  = Adam(self.critic.parameters(), lr=1e-2)
@@ -156,10 +158,10 @@ class DDPG(object):
         return -policy_loss, value_loss
 
     def observe(self, reward, state, done, step):
-        s0 = torch.tensor(self.state, device='cpu')
+        s0 = self.state.to(device='cpu')
         a = to_tensor(self.action, "cpu")
         r = to_tensor(reward, "cpu")
-        s1 = torch.tensor(state, device='cpu')
+        s1 = state.to(device='cpu')
         d = to_tensor(done.astype('float32'), "cpu")
         for i in range(self.env_batch):
             self.memory.append([s0[i], a[i], r[i], s1[i], d[i]])
@@ -194,12 +196,12 @@ class DDPG(object):
         self.critic.load_state_dict(torch.load('{}/critic.pkl'.format(path)))
         load_gan(path)
         
-    def save_model(self, path):
+    def save_model(self, path, i):
         self.actor.cpu()
         self.critic.cpu()
-        torch.save(self.actor.state_dict(),'{}/actor.pkl'.format(path))
-        torch.save(self.critic.state_dict(),'{}/critic.pkl'.format(path))
-        save_gan(path)
+        torch.save(self.actor.state_dict(),'{}/actor_{}.pkl'.format(path, i))
+        torch.save(self.critic.state_dict(),'{}/critic_{}.pkl'.format(path, i))
+        save_gan(path, i)
         self.choose_device()
 
     def eval(self):
